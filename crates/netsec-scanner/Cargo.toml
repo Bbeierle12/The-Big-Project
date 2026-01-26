@@ -8,6 +8,7 @@ netsec-models = { workspace = true, features = ["sqlx"] }
 netsec-parsers = { workspace = true }
 netsec-db = { workspace = true }
 netsec-events = { workspace = true }
+netsec-platform = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

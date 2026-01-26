@@ -2,7 +2,9 @@
 //! device classification and fingerprinting.
 
 pub mod active;
+pub mod executor;
 pub mod fingerprint;
+pub mod listener;
 pub mod passive;
 
 use thiserror::Error;

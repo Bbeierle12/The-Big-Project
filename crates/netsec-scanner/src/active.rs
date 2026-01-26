@@ -270,6 +270,34 @@ impl ActiveScanner {
         Ok(scan)
     }
 
+    /// Run a full scan: create record, execute nmap, persist results.
+    ///
+    /// 1. Creates a scan record in the database (status=running).
+    /// 2. Executes nmap via `crate::executor::execute_nmap`.
+    /// 3. On success: processes results, persists hosts, marks scan complete.
+    /// 4. On failure: marks scan as failed in the database.
+    pub async fn run_scan(&self, config: &ScanConfig) -> ScannerResult<Vec<Device>> {
+        let scan = self.create_scan_record(config).await?;
+        match crate::executor::execute_nmap(config).await {
+            Ok(result) => {
+                let hosts = process_nmap_results(&result);
+                let devices = self.persist_hosts(&hosts).await?;
+                self.complete_scan(&scan.id, &hosts).await?;
+                Ok(devices)
+            }
+            Err(e) => {
+                let _ = netsec_db::repo::scans::update_status(
+                    &self.pool,
+                    &scan.id,
+                    "failed",
+                    0.0,
+                )
+                .await;
+                Err(e)
+            }
+        }
+    }
+
     /// Mark a scan as completed and store a results summary.
     pub async fn complete_scan(
         &self,
