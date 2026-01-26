@@ -74,6 +74,13 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     Ok(result.rows_affected() > 0)
 }
 
+pub async fn get_by_mac(pool: &SqlitePool, mac: &str) -> Result<Option<Device>, sqlx::Error> {
+    sqlx::query_as::<_, Device>("SELECT * FROM devices WHERE mac = ?")
+        .bind(mac)
+        .fetch_optional(pool)
+        .await
+}
+
 pub async fn count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
     let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM devices")
         .fetch_one(pool)
