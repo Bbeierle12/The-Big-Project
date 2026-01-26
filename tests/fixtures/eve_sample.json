@@ -1,0 +1,2 @@
+{"timestamp":"2024-01-15T10:30:00.000000+0000","event_type":"alert","src_ip":"192.168.1.100","src_port":54321,"dest_ip":"10.0.0.1","dest_port":443,"proto":"TCP","alert":{"action":"allowed","signature":"ET SCAN Nmap Scripting Engine User-Agent Detected","signature_id":2024364,"severity":2,"category":"Attempted Information Leak"}}
+{"timestamp":"2024-01-15T10:30:01.000000+0000","event_type":"flow","src_ip":"192.168.1.100","src_port":54321,"dest_ip":"10.0.0.1","dest_port":443,"proto":"TCP"}

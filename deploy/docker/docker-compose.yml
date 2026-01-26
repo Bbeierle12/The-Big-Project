@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  netsec:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    ports:
+      - "8420:8420"
+    volumes:
+      - netsec-data:/app/data
+      - ./config/local.toml:/app/config/local.toml:ro
+    environment:
+      - NETSEC_LOG_LEVEL=INFO
+    restart: unless-stopped
+    network_mode: host  # Required for network scanning
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+
+volumes:
+  netsec-data:

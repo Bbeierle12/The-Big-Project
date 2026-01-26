@@ -1,0 +1,37 @@
+[server]
+host = "127.0.0.1"
+port = 8420
+reload = false
+workers = 1
+
+[database]
+url = "sqlite+aiosqlite:///./netsec.db"
+echo = false
+
+[logging]
+level = "INFO"
+format = "json"
+
+[scheduler]
+enabled = true
+timezone = "UTC"
+
+[auth]
+enabled = false
+api_key = ""
+
+[alerts]
+dedup_window_seconds = 300
+max_alerts_per_minute = 100
+
+[alerts.dispatch]
+webhook_url = ""
+email_enabled = false
+email_smtp_host = ""
+email_smtp_port = 587
+email_from = ""
+email_to = ""
+
+[tools]
+scan_timeout = 300
+max_concurrent_scans = 3

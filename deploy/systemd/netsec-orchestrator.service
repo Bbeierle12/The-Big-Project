@@ -1,0 +1,25 @@
+[Unit]
+Description=NetSec Orchestrator
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netsec
+Group=netsec
+WorkingDirectory=/opt/netsec-orchestrator
+ExecStart=/opt/netsec-orchestrator/.venv/bin/python -m netsec
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/netsec-orchestrator/data /opt/netsec-orchestrator/netsec.db
+
+[Install]
+WantedBy=multi-user.target
