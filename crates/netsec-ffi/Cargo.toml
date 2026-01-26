@@ -1,0 +1,14 @@
+[package]
+name = "netsec-ffi"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "netsec_ffi"
+crate-type = ["cdylib"]
+
+[dependencies]
+netsec-core = { workspace = true }
+netsec-models = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

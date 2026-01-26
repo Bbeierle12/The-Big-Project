@@ -1,0 +1,16 @@
+[package]
+name = "netsec-python"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "netsec_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+netsec-core = { workspace = true }
+netsec-models = { workspace = true }
+netsec-parsers = { workspace = true }
+pyo3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

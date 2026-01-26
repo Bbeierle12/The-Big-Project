@@ -1,0 +1,21 @@
+[package]
+name = "netsec-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+netsec-models = { workspace = true }
+netsec-db = { workspace = true }
+netsec-events = { workspace = true }
+netsec-parsers = { workspace = true }
+netsec-pipeline = { workspace = true }
+netsec-scanner = { workspace = true }
+netsec-scheduler = { workspace = true }
+netsec-platform = { workspace = true }
+netsec-threat = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+config = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

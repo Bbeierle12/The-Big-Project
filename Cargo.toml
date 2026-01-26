@@ -1,6 +1,50 @@
 [workspace]
 resolver = "2"
 members = [
-    "rust/netsec-stream",
-    "rust/netsec-nmap",
+    "crates/netsec-models",
+    "crates/netsec-db",
+    "crates/netsec-events",
+    "crates/netsec-parsers",
+    "crates/netsec-pipeline",
+    "crates/netsec-scanner",
+    "crates/netsec-scheduler",
+    "crates/netsec-platform",
+    "crates/netsec-threat",
+    "crates/netsec-core",
+    "crates/netsec-python",
+    "crates/netsec-ffi",
 ]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+# Internal crates
+netsec-models = { path = "crates/netsec-models" }
+netsec-db = { path = "crates/netsec-db" }
+netsec-events = { path = "crates/netsec-events" }
+netsec-parsers = { path = "crates/netsec-parsers" }
+netsec-pipeline = { path = "crates/netsec-pipeline" }
+netsec-scanner = { path = "crates/netsec-scanner" }
+netsec-scheduler = { path = "crates/netsec-scheduler" }
+netsec-platform = { path = "crates/netsec-platform" }
+netsec-threat = { path = "crates/netsec-threat" }
+netsec-core = { path = "crates/netsec-core" }
+
+# Shared external dependencies
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "uuid"] }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+quick-xml = { version = "0.36", features = ["serialize"] }
+config = "0.14"
+socket2 = "0.5"
