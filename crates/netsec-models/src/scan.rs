@@ -126,4 +126,48 @@ mod tests {
             assert_eq!(ScanStatus::from_str_lossy(s.as_str()), s);
         }
     }
+
+    // A2: ScanType enum roundtrip
+    #[test]
+    fn test_scan_type_roundtrip() {
+        for t in [
+            ScanType::Discovery,
+            ScanType::Port,
+            ScanType::Vulnerability,
+            ScanType::Full,
+            ScanType::Custom,
+        ] {
+            assert_eq!(ScanType::from_str_lossy(t.as_str()), t);
+        }
+    }
+
+    // A5: from_str_lossy fallback tests
+    #[test]
+    fn test_scan_status_from_str_lossy_fallback() {
+        assert_eq!(ScanStatus::from_str_lossy("garbage"), ScanStatus::Pending);
+        assert_eq!(ScanStatus::from_str_lossy(""), ScanStatus::Pending);
+    }
+
+    #[test]
+    fn test_scan_type_from_str_lossy_fallback() {
+        assert_eq!(ScanType::from_str_lossy("garbage"), ScanType::Custom);
+        assert_eq!(ScanType::from_str_lossy(""), ScanType::Custom);
+    }
+
+    // A7: Constructor defaults
+    #[test]
+    fn test_scan_constructor_defaults() {
+        let scan = Scan::new("nmap".into(), "10.0.0.0/24".into(), ScanType::Full);
+        assert_eq!(scan.tool, "nmap");
+        assert_eq!(scan.target, "10.0.0.0/24");
+        assert_eq!(scan.scan_type, "full");
+        assert_eq!(scan.status, "pending");
+        assert_eq!(scan.progress, 0.0);
+        assert_eq!(scan.parameters, "{}");
+        assert_eq!(scan.results, "{}");
+        assert!(scan.started_at.is_none());
+        assert!(scan.completed_at.is_none());
+        uuid::Uuid::parse_str(&scan.id).expect("id should be valid UUID");
+        assert!(!scan.created_at.is_empty());
+    }
 }

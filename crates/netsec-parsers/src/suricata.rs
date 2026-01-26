@@ -76,4 +76,37 @@ mod tests {
         let all = parse_eve_batch(data, false);
         assert_eq!(all.len(), 2);
     }
+
+    // C1: Malformed input
+    #[test]
+    fn test_eve_malformed_json() {
+        let data = "this is not json\n{\"event_type\":\"alert\"}\nmore garbage";
+        let events = parse_eve_batch(data, false);
+        // Only the valid JSON line should be parsed
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn test_eve_empty_input() {
+        let events = parse_eve_batch("", false);
+        assert!(events.is_empty());
+
+        let events2 = parse_eve_batch("", true);
+        assert!(events2.is_empty());
+    }
+
+    // C2: Mixed events with alerts_only=false
+    #[test]
+    fn test_eve_mixed_events() {
+        let data = r#"{"event_type":"flow","src_ip":"10.0.0.1"}
+{"event_type":"dns","src_ip":"10.0.0.2"}
+{"event_type":"alert","src_ip":"10.0.0.3","alert":{"action":"blocked","signature":"ET SCAN","signature_id":2000001,"severity":2,"category":"scan"}}
+{"event_type":"http","src_ip":"10.0.0.4"}"#;
+        let all = parse_eve_batch(data, false);
+        assert_eq!(all.len(), 4);
+
+        let alerts_only = parse_eve_batch(data, true);
+        assert_eq!(alerts_only.len(), 1);
+        assert_eq!(alerts_only[0].src_ip.as_deref(), Some("10.0.0.3"));
+    }
 }

@@ -33,3 +33,43 @@ pub enum NetsecError {
 }
 
 pub type Result<T> = std::result::Result<T, NetsecError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_netsec_error_display() {
+        let err = NetsecError::Database("connection refused".into());
+        assert_eq!(format!("{err}"), "database error: connection refused");
+
+        let err = NetsecError::Parse("invalid JSON".into());
+        assert_eq!(format!("{err}"), "parse error: invalid JSON");
+
+        let err = NetsecError::Scan("timeout".into());
+        assert_eq!(format!("{err}"), "scan error: timeout");
+
+        let err = NetsecError::Plugin("not found".into());
+        assert_eq!(format!("{err}"), "plugin error: not found");
+
+        let err = NetsecError::Config("missing key".into());
+        assert_eq!(format!("{err}"), "configuration error: missing key");
+
+        let err = NetsecError::Platform("unsupported".into());
+        assert_eq!(format!("{err}"), "platform error: unsupported");
+
+        let err = NetsecError::NotFound("device xyz".into());
+        assert_eq!(format!("{err}"), "not found: device xyz");
+
+        let err = NetsecError::Other("something".into());
+        assert_eq!(format!("{err}"), "something");
+    }
+
+    #[test]
+    fn test_netsec_error_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file missing");
+        let err: NetsecError = io_err.into();
+        let msg = format!("{err}");
+        assert!(msg.contains("file missing"));
+    }
+}

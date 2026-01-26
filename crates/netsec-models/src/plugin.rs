@@ -100,4 +100,33 @@ mod tests {
         assert_eq!(back.task_type, "full_scan");
         assert!(back.enabled);
     }
+
+    // A4: TriggerType enum roundtrip
+    #[test]
+    fn test_trigger_type_roundtrip() {
+        for t in [TriggerType::Cron, TriggerType::Interval] {
+            assert_eq!(TriggerType::from_str_lossy(t.as_str()), t);
+        }
+    }
+
+    // A5: from_str_lossy fallback test
+    #[test]
+    fn test_trigger_type_from_str_lossy_fallback() {
+        assert_eq!(TriggerType::from_str_lossy("garbage"), TriggerType::Interval);
+        assert_eq!(TriggerType::from_str_lossy(""), TriggerType::Interval);
+    }
+
+    // A7: Constructor defaults
+    #[test]
+    fn test_scheduled_job_constructor_defaults() {
+        let job = ScheduledJob::new(TriggerType::Interval, "port_scan".into());
+        assert_eq!(job.trigger_type, "interval");
+        assert_eq!(job.task_type, "port_scan");
+        assert_eq!(job.trigger_args, "{}");
+        assert_eq!(job.task_params, "{}");
+        assert!(job.enabled);
+        uuid::Uuid::parse_str(&job.id).expect("id should be valid UUID");
+        assert!(!job.created_at.is_empty());
+        assert!(!job.updated_at.is_empty());
+    }
 }

@@ -222,4 +222,96 @@ mod tests {
         assert_eq!(back.severity, Severity::High);
         assert_eq!(back.category, AlertCategory::Intrusion);
     }
+
+    // A1: AlertStatus enum roundtrip
+    #[test]
+    fn test_alert_status_roundtrip() {
+        for s in [
+            AlertStatus::New,
+            AlertStatus::Acknowledged,
+            AlertStatus::Resolved,
+            AlertStatus::FalsePositive,
+        ] {
+            assert_eq!(AlertStatus::from_str_lossy(s.as_str()), s);
+        }
+    }
+
+    // A1: AlertCategory enum roundtrip
+    #[test]
+    fn test_alert_category_roundtrip() {
+        for c in [
+            AlertCategory::Intrusion,
+            AlertCategory::Malware,
+            AlertCategory::Vulnerability,
+            AlertCategory::PolicyViolation,
+            AlertCategory::Anomaly,
+            AlertCategory::NetworkThreat,
+            AlertCategory::Other,
+        ] {
+            assert_eq!(AlertCategory::from_str_lossy(c.as_str()), c);
+        }
+    }
+
+    // A5: from_str_lossy fallback tests
+    #[test]
+    fn test_severity_from_str_lossy_fallback() {
+        assert_eq!(Severity::from_str_lossy("garbage"), Severity::Info);
+        assert_eq!(Severity::from_str_lossy(""), Severity::Info);
+        assert_eq!(Severity::from_str_lossy("HIGH"), Severity::Info); // case-sensitive
+    }
+
+    #[test]
+    fn test_alert_status_from_str_lossy_fallback() {
+        assert_eq!(AlertStatus::from_str_lossy("garbage"), AlertStatus::New);
+        assert_eq!(AlertStatus::from_str_lossy(""), AlertStatus::New);
+    }
+
+    #[test]
+    fn test_alert_category_from_str_lossy_fallback() {
+        assert_eq!(AlertCategory::from_str_lossy("garbage"), AlertCategory::Other);
+        assert_eq!(AlertCategory::from_str_lossy(""), AlertCategory::Other);
+    }
+
+    // A6: Accessor method tests
+    #[test]
+    fn test_alert_severity_enum_accessor() {
+        let mut alert = Alert::new("test".into(), "nmap".into(), "fp".into());
+        assert_eq!(alert.severity_enum(), Severity::Info);
+        alert.severity = "critical".to_string();
+        assert_eq!(alert.severity_enum(), Severity::Critical);
+    }
+
+    #[test]
+    fn test_alert_status_enum_accessor() {
+        let mut alert = Alert::new("test".into(), "nmap".into(), "fp".into());
+        assert_eq!(alert.status_enum(), AlertStatus::New);
+        alert.status = "resolved".to_string();
+        assert_eq!(alert.status_enum(), AlertStatus::Resolved);
+    }
+
+    #[test]
+    fn test_alert_category_enum_accessor() {
+        let mut alert = Alert::new("test".into(), "nmap".into(), "fp".into());
+        assert_eq!(alert.category_enum(), AlertCategory::Other);
+        alert.category = "malware".to_string();
+        assert_eq!(alert.category_enum(), AlertCategory::Malware);
+    }
+
+    // A7: Constructor defaults
+    #[test]
+    fn test_alert_constructor_defaults() {
+        let alert = Alert::new("Test alert".into(), "suricata".into(), "fp-test".into());
+        assert_eq!(alert.severity, "info");
+        assert_eq!(alert.status, "new");
+        assert_eq!(alert.category, "other");
+        assert_eq!(alert.count, 1);
+        assert_eq!(alert.description, "");
+        assert!(alert.device_ip.is_none());
+        assert!(alert.correlation_id.is_none());
+        // ID is a valid UUID
+        uuid::Uuid::parse_str(&alert.id).expect("id should be valid UUID");
+        // Timestamps are present
+        assert!(!alert.created_at.is_empty());
+        assert!(!alert.updated_at.is_empty());
+    }
 }

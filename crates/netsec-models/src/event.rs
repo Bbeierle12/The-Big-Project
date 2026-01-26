@@ -156,4 +156,62 @@ mod tests {
         let back: Observation = serde_json::from_str(&json).unwrap();
         assert_eq!(back.protocol, "mdns");
     }
+
+    // A3: DeviceEventType enum roundtrip
+    #[test]
+    fn test_device_event_type_roundtrip() {
+        for t in [
+            DeviceEventType::Joined,
+            DeviceEventType::Left,
+            DeviceEventType::Updated,
+            DeviceEventType::Classified,
+        ] {
+            assert_eq!(DeviceEventType::from_str_lossy(t.as_str()), t);
+        }
+    }
+
+    // A5: from_str_lossy fallback test
+    #[test]
+    fn test_device_event_type_from_str_lossy_fallback() {
+        assert_eq!(DeviceEventType::from_str_lossy("garbage"), DeviceEventType::Updated);
+        assert_eq!(DeviceEventType::from_str_lossy(""), DeviceEventType::Updated);
+    }
+
+    // A7: Constructor defaults
+    #[test]
+    fn test_netsec_event_constructor_defaults() {
+        let event = NetsecEvent::new(
+            EventType::AlertCreated,
+            serde_json::json!({"test": true}),
+        );
+        uuid::Uuid::parse_str(&event.id).expect("id should be valid UUID");
+        assert!(!event.timestamp.is_empty());
+        assert_eq!(event.event_type, EventType::AlertCreated);
+    }
+
+    #[test]
+    fn test_device_event_constructor_defaults() {
+        let de = DeviceEvent::new(
+            "dev-1".into(),
+            DeviceEventType::Left,
+            serde_json::json!({"reason": "timeout"}),
+        );
+        uuid::Uuid::parse_str(&de.id).expect("id should be valid UUID");
+        assert_eq!(de.device_id, "dev-1");
+        assert_eq!(de.event_type, "left");
+        assert!(!de.created_at.is_empty());
+    }
+
+    #[test]
+    fn test_observation_constructor_defaults() {
+        let obs = Observation::new(
+            "dev-2".into(),
+            "ssdp".into(),
+            serde_json::json!({}),
+        );
+        uuid::Uuid::parse_str(&obs.id).expect("id should be valid UUID");
+        assert_eq!(obs.device_id, "dev-2");
+        assert_eq!(obs.protocol, "ssdp");
+        assert!(!obs.created_at.is_empty());
+    }
 }

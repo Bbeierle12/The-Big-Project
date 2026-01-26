@@ -245,4 +245,78 @@ mod tests {
         assert_eq!(host.ports[0].service.get("name").unwrap(), "http");
         assert_eq!(host.ports[1].port, 443);
     }
+
+    // C1: Malformed input tests
+    #[test]
+    fn test_nmap_malformed_xml() {
+        // Mismatched tags cause a parse error
+        let result = parse_nmap_xml("<nmaprun><host></nmaprun>");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_nmap_non_xml_returns_empty() {
+        // Plain text is not an error but produces no hosts
+        let result = parse_nmap_xml("this is not xml at all").unwrap();
+        assert!(result.hosts.is_empty());
+        assert!(result.scan_info.is_empty());
+    }
+
+    #[test]
+    fn test_nmap_missing_nmaprun() {
+        let xml = r#"<?xml version="1.0"?><other_root><item/></other_root>"#;
+        let result = parse_nmap_xml(xml).unwrap();
+        // Parses successfully but no hosts and no scan_info from nmaprun
+        assert!(result.hosts.is_empty());
+        assert!(result.scan_info.is_empty());
+    }
+
+    #[test]
+    fn test_nmap_host_no_ports() {
+        let xml = r#"<?xml version="1.0"?>
+<nmaprun scanner="nmap">
+  <host>
+    <status state="up"/>
+    <address addr="192.168.1.5" addrtype="ipv4"/>
+  </host>
+</nmaprun>"#;
+        let result = parse_nmap_xml(xml).unwrap();
+        assert_eq!(result.hosts.len(), 1);
+        assert_eq!(result.hosts[0].addresses.get("ipv4").unwrap(), "192.168.1.5");
+        assert!(result.hosts[0].ports.is_empty());
+    }
+
+    // C2: Multiple hosts
+    #[test]
+    fn test_nmap_multiple_hosts() {
+        let xml = r#"<?xml version="1.0"?>
+<nmaprun scanner="nmap">
+  <host>
+    <status state="up"/>
+    <address addr="10.0.0.1" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="22"><state state="open"/></port>
+    </ports>
+  </host>
+  <host>
+    <status state="up"/>
+    <address addr="10.0.0.2" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="80"><state state="open"/></port>
+    </ports>
+  </host>
+  <host>
+    <status state="down"/>
+    <address addr="10.0.0.3" addrtype="ipv4"/>
+  </host>
+</nmaprun>"#;
+        let result = parse_nmap_xml(xml).unwrap();
+        assert_eq!(result.hosts.len(), 3);
+        assert_eq!(result.hosts[0].addresses.get("ipv4").unwrap(), "10.0.0.1");
+        assert_eq!(result.hosts[0].ports[0].port, 22);
+        assert_eq!(result.hosts[1].addresses.get("ipv4").unwrap(), "10.0.0.2");
+        assert_eq!(result.hosts[1].ports[0].port, 80);
+        assert_eq!(result.hosts[2].status, "down");
+        assert!(result.hosts[2].ports.is_empty());
+    }
 }

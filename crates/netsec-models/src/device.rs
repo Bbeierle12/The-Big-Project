@@ -154,4 +154,71 @@ mod tests {
             assert_eq!(DeviceStatus::from_str_lossy(s.as_str()), s);
         }
     }
+
+    // A5: from_str_lossy fallback tests
+    #[test]
+    fn test_device_status_from_str_lossy_fallback() {
+        assert_eq!(DeviceStatus::from_str_lossy("garbage"), DeviceStatus::Unknown);
+        assert_eq!(DeviceStatus::from_str_lossy(""), DeviceStatus::Unknown);
+    }
+
+    #[test]
+    fn test_device_type_from_str_lossy_fallback() {
+        assert_eq!(DeviceType::from_str_lossy("garbage"), DeviceType::Unknown);
+        assert_eq!(DeviceType::from_str_lossy(""), DeviceType::Unknown);
+    }
+
+    // Complete DeviceType roundtrip (existing test misses some variants)
+    #[test]
+    fn test_device_type_all_variants_roundtrip() {
+        for dt in [
+            DeviceType::Workstation,
+            DeviceType::Server,
+            DeviceType::Router,
+            DeviceType::Switch,
+            DeviceType::AccessPoint,
+            DeviceType::Printer,
+            DeviceType::IoT,
+            DeviceType::Mobile,
+            DeviceType::Unknown,
+        ] {
+            assert_eq!(DeviceType::from_str_lossy(dt.as_str()), dt);
+        }
+    }
+
+    // A6: Accessor method tests
+    #[test]
+    fn test_device_type_enum_accessor() {
+        let mut device = Device::new("10.0.0.1".into());
+        assert_eq!(device.device_type_enum(), DeviceType::Unknown);
+        device.device_type = "server".to_string();
+        assert_eq!(device.device_type_enum(), DeviceType::Server);
+    }
+
+    #[test]
+    fn test_device_status_enum_accessor() {
+        let mut device = Device::new("10.0.0.1".into());
+        assert_eq!(device.status_enum(), DeviceStatus::Unknown);
+        device.status = "online".to_string();
+        assert_eq!(device.status_enum(), DeviceStatus::Online);
+    }
+
+    // A7: Constructor defaults
+    #[test]
+    fn test_device_constructor_defaults() {
+        let device = Device::new("1.2.3.4".into());
+        assert_eq!(device.ip, "1.2.3.4");
+        assert_eq!(device.device_type, "unknown");
+        assert_eq!(device.status, "unknown");
+        assert_eq!(device.classification_confidence, 0.0);
+        assert!(device.mac.is_none());
+        assert!(device.hostname.is_none());
+        assert!(device.vendor.is_none());
+        assert!(device.os_family.is_none());
+        // ID is a valid UUID
+        uuid::Uuid::parse_str(&device.id).expect("id should be valid UUID");
+        // Timestamps present
+        assert!(!device.first_seen.is_empty());
+        assert!(!device.last_seen.is_empty());
+    }
 }

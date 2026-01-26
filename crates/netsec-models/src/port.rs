@@ -51,4 +51,20 @@ mod tests {
         assert_eq!(back.protocol, "tcp");
         assert_eq!(back.device_id, "dev-1");
     }
+
+    // A7: Constructor defaults
+    #[test]
+    fn test_port_constructor_defaults() {
+        let port = Port::new("dev-1".into(), 80, "tcp".into());
+        assert_eq!(port.device_id, "dev-1");
+        assert_eq!(port.port_number, 80);
+        assert_eq!(port.protocol, "tcp");
+        assert_eq!(port.state, "unknown");
+        assert!(port.service_name.is_none());
+        assert!(port.service_version.is_none());
+        assert!(port.banner.is_none());
+        uuid::Uuid::parse_str(&port.id).expect("id should be valid UUID");
+        assert!(!port.first_seen.is_empty());
+        assert!(!port.last_seen.is_empty());
+    }
 }

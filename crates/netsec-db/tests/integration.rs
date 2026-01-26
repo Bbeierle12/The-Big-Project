@@ -253,3 +253,304 @@ async fn test_cascade_delete_device() {
     let o = observations::list_by_device(&pool, &device.id, 10).await.unwrap();
     assert!(o.is_empty());
 }
+
+// ============================================================
+// B1: Untested CRUD operations
+// ============================================================
+
+#[tokio::test]
+async fn test_port_delete() {
+    let pool = setup().await;
+    let device = Device::new("10.0.0.20".into());
+    devices::insert(&pool, &device).await.unwrap();
+
+    let port = Port::new(device.id.clone(), 22, "tcp".into());
+    ports::insert(&pool, &port).await.unwrap();
+    assert!(ports::get_by_id(&pool, &port.id).await.unwrap().is_some());
+
+    let deleted = ports::delete(&pool, &port.id).await.unwrap();
+    assert!(deleted);
+    assert!(ports::get_by_id(&pool, &port.id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn test_alert_list_and_pagination() {
+    let pool = setup().await;
+
+    let a1 = Alert::new("Alert 1".into(), "nmap".into(), "fp-1".into());
+    let a2 = Alert::new("Alert 2".into(), "nmap".into(), "fp-2".into());
+    let a3 = Alert::new("Alert 3".into(), "nmap".into(), "fp-3".into());
+    alerts::insert(&pool, &a1).await.unwrap();
+    alerts::insert(&pool, &a2).await.unwrap();
+    alerts::insert(&pool, &a3).await.unwrap();
+
+    let page1 = alerts::list(&pool, 2, 0).await.unwrap();
+    assert_eq!(page1.len(), 2);
+
+    let page2 = alerts::list(&pool, 2, 2).await.unwrap();
+    assert_eq!(page2.len(), 1);
+}
+
+#[tokio::test]
+async fn test_alert_update_status() {
+    let pool = setup().await;
+    let alert = Alert::new("Status test".into(), "suricata".into(), "fp-status".into());
+    alerts::insert(&pool, &alert).await.unwrap();
+
+    let updated = alerts::update_status(&pool, &alert.id, "acknowledged", "2025-01-01T00:00:00Z").await.unwrap();
+    assert!(updated);
+
+    let fetched = alerts::get_by_id(&pool, &alert.id).await.unwrap().unwrap();
+    assert_eq!(fetched.status, "acknowledged");
+}
+
+#[tokio::test]
+async fn test_alert_delete() {
+    let pool = setup().await;
+    let alert = Alert::new("Delete me".into(), "nmap".into(), "fp-del".into());
+    alerts::insert(&pool, &alert).await.unwrap();
+
+    let deleted = alerts::delete(&pool, &alert.id).await.unwrap();
+    assert!(deleted);
+    assert!(alerts::get_by_id(&pool, &alert.id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn test_scan_list_pagination() {
+    let pool = setup().await;
+    let s1 = Scan::new("nmap".into(), "10.0.0.0/24".into(), ScanType::Discovery);
+    let s2 = Scan::new("nmap".into(), "10.0.1.0/24".into(), ScanType::Port);
+    scans::insert(&pool, &s1).await.unwrap();
+    scans::insert(&pool, &s2).await.unwrap();
+
+    let page = scans::list(&pool, 1, 0).await.unwrap();
+    assert_eq!(page.len(), 1);
+
+    let all = scans::list(&pool, 100, 0).await.unwrap();
+    assert_eq!(all.len(), 2);
+}
+
+#[tokio::test]
+async fn test_scan_delete() {
+    let pool = setup().await;
+    let scan = Scan::new("nmap".into(), "10.0.0.0/24".into(), ScanType::Full);
+    scans::insert(&pool, &scan).await.unwrap();
+
+    let deleted = scans::delete(&pool, &scan.id).await.unwrap();
+    assert!(deleted);
+    assert!(scans::get_by_id(&pool, &scan.id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn test_vulnerability_list() {
+    let pool = setup().await;
+    let v1 = Vulnerability::new("Vuln 1".into(), "openvas".into(), Severity::High);
+    let v2 = Vulnerability::new("Vuln 2".into(), "openvas".into(), Severity::Low);
+    vulnerabilities::insert(&pool, &v1).await.unwrap();
+    vulnerabilities::insert(&pool, &v2).await.unwrap();
+
+    let page = vulnerabilities::list(&pool, 1, 0).await.unwrap();
+    assert_eq!(page.len(), 1);
+
+    let all = vulnerabilities::list(&pool, 100, 0).await.unwrap();
+    assert_eq!(all.len(), 2);
+}
+
+#[tokio::test]
+async fn test_vulnerability_list_by_device() {
+    let pool = setup().await;
+    let d1 = Device::new("10.0.0.30".into());
+    let d2 = Device::new("10.0.0.31".into());
+    devices::insert(&pool, &d1).await.unwrap();
+    devices::insert(&pool, &d2).await.unwrap();
+
+    let mut v1 = Vulnerability::new("Vuln A".into(), "openvas".into(), Severity::High);
+    v1.device_id = Some(d1.id.clone());
+    let mut v2 = Vulnerability::new("Vuln B".into(), "openvas".into(), Severity::Medium);
+    v2.device_id = Some(d2.id.clone());
+    let mut v3 = Vulnerability::new("Vuln C".into(), "openvas".into(), Severity::Low);
+    v3.device_id = Some(d1.id.clone());
+
+    vulnerabilities::insert(&pool, &v1).await.unwrap();
+    vulnerabilities::insert(&pool, &v2).await.unwrap();
+    vulnerabilities::insert(&pool, &v3).await.unwrap();
+
+    let d1_vulns = vulnerabilities::list_by_device(&pool, &d1.id).await.unwrap();
+    assert_eq!(d1_vulns.len(), 2);
+
+    let d2_vulns = vulnerabilities::list_by_device(&pool, &d2.id).await.unwrap();
+    assert_eq!(d2_vulns.len(), 1);
+}
+
+#[tokio::test]
+async fn test_vulnerability_delete() {
+    let pool = setup().await;
+    let vuln = Vulnerability::new("Delete me".into(), "nmap".into(), Severity::Info);
+    vulnerabilities::insert(&pool, &vuln).await.unwrap();
+
+    let deleted = vulnerabilities::delete(&pool, &vuln.id).await.unwrap();
+    assert!(deleted);
+    assert!(vulnerabilities::get_by_id(&pool, &vuln.id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn test_traffic_delete() {
+    let pool = setup().await;
+    let flow = TrafficFlow::new("10.0.0.1".into(), 1111, "10.0.0.2".into(), 80, "tcp".into());
+    traffic::insert(&pool, &flow).await.unwrap();
+
+    let deleted = traffic::delete(&pool, &flow.id).await.unwrap();
+    assert!(deleted);
+    assert!(traffic::get_by_id(&pool, &flow.id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn test_scheduled_jobs_list_pagination() {
+    let pool = setup().await;
+    let j1 = ScheduledJob::new(TriggerType::Cron, "scan_1".into());
+    let j2 = ScheduledJob::new(TriggerType::Interval, "scan_2".into());
+    scheduled_jobs::insert(&pool, &j1).await.unwrap();
+    scheduled_jobs::insert(&pool, &j2).await.unwrap();
+
+    let page = scheduled_jobs::list(&pool, 1, 0).await.unwrap();
+    assert_eq!(page.len(), 1);
+
+    let all = scheduled_jobs::list(&pool, 100, 0).await.unwrap();
+    assert_eq!(all.len(), 2);
+}
+
+#[tokio::test]
+async fn test_scheduled_jobs_delete() {
+    let pool = setup().await;
+    let job = ScheduledJob::new(TriggerType::Cron, "delete_me".into());
+    scheduled_jobs::insert(&pool, &job).await.unwrap();
+
+    let deleted = scheduled_jobs::delete(&pool, &job.id).await.unwrap();
+    assert!(deleted);
+    assert!(scheduled_jobs::get_by_id(&pool, &job.id).await.unwrap().is_none());
+}
+
+// ============================================================
+// B2: Edge case tests
+// ============================================================
+
+#[tokio::test]
+async fn test_get_nonexistent_returns_none() {
+    let pool = setup().await;
+    let fake_id = uuid::Uuid::new_v4().to_string();
+
+    assert!(devices::get_by_id(&pool, &fake_id).await.unwrap().is_none());
+    assert!(ports::get_by_id(&pool, &fake_id).await.unwrap().is_none());
+    assert!(alerts::get_by_id(&pool, &fake_id).await.unwrap().is_none());
+    assert!(scans::get_by_id(&pool, &fake_id).await.unwrap().is_none());
+    assert!(vulnerabilities::get_by_id(&pool, &fake_id).await.unwrap().is_none());
+    assert!(traffic::get_by_id(&pool, &fake_id).await.unwrap().is_none());
+    assert!(scheduled_jobs::get_by_id(&pool, &fake_id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn test_delete_nonexistent_returns_false() {
+    let pool = setup().await;
+    let fake_id = uuid::Uuid::new_v4().to_string();
+
+    assert!(!devices::delete(&pool, &fake_id).await.unwrap());
+    assert!(!ports::delete(&pool, &fake_id).await.unwrap());
+    assert!(!alerts::delete(&pool, &fake_id).await.unwrap());
+    assert!(!scans::delete(&pool, &fake_id).await.unwrap());
+    assert!(!vulnerabilities::delete(&pool, &fake_id).await.unwrap());
+    assert!(!traffic::delete(&pool, &fake_id).await.unwrap());
+    assert!(!scheduled_jobs::delete(&pool, &fake_id).await.unwrap());
+}
+
+#[tokio::test]
+async fn test_update_nonexistent_returns_false() {
+    let pool = setup().await;
+    let fake_id = uuid::Uuid::new_v4().to_string();
+
+    // devices::update with non-existent ID
+    let mut fake_device = Device::new("1.1.1.1".into());
+    fake_device.id = fake_id.clone();
+    assert!(!devices::update(&pool, &fake_device).await.unwrap());
+
+    // alerts::update_status with non-existent ID
+    assert!(!alerts::update_status(&pool, &fake_id, "resolved", "2025-01-01T00:00:00Z").await.unwrap());
+
+    // scans::update_status with non-existent ID
+    assert!(!scans::update_status(&pool, &fake_id, "running", 0.5).await.unwrap());
+
+    // scheduled_jobs::set_enabled with non-existent ID
+    assert!(!scheduled_jobs::set_enabled(&pool, &fake_id, false, "2025-01-01T00:00:00Z").await.unwrap());
+}
+
+#[tokio::test]
+async fn test_empty_list() {
+    let pool = setup().await;
+
+    assert!(devices::list(&pool, 100, 0).await.unwrap().is_empty());
+    assert!(alerts::list(&pool, 100, 0).await.unwrap().is_empty());
+    assert!(scans::list(&pool, 100, 0).await.unwrap().is_empty());
+    assert!(vulnerabilities::list(&pool, 100, 0).await.unwrap().is_empty());
+    assert!(traffic::list(&pool, 100, 0).await.unwrap().is_empty());
+    assert!(scheduled_jobs::list(&pool, 100, 0).await.unwrap().is_empty());
+    assert!(scheduled_jobs::list_enabled(&pool).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn test_pagination_past_end() {
+    let pool = setup().await;
+
+    let device = Device::new("10.0.0.50".into());
+    devices::insert(&pool, &device).await.unwrap();
+
+    // Offset past count should return empty
+    let result = devices::list(&pool, 100, 100).await.unwrap();
+    assert!(result.is_empty());
+}
+
+// ============================================================
+// B3: Constraint violation tests
+// ============================================================
+
+#[tokio::test]
+async fn test_duplicate_id_insert() {
+    let pool = setup().await;
+    let device = Device::new("10.0.0.60".into());
+    devices::insert(&pool, &device).await.unwrap();
+
+    // Inserting same ID again should error
+    let result = devices::insert(&pool, &device).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_fk_violation_port() {
+    let pool = setup().await;
+
+    // Insert port with non-existent device_id (foreign key violation)
+    let port = Port::new("nonexistent-device-id".into(), 80, "tcp".into());
+    let result = ports::insert(&pool, &port).await;
+    assert!(result.is_err());
+}
+
+// ============================================================
+// B4: Cascade behavior - vulnerability FK SET NULL
+// ============================================================
+
+#[tokio::test]
+async fn test_vulnerability_device_set_null() {
+    let pool = setup().await;
+
+    let device = Device::new("10.0.0.70".into());
+    devices::insert(&pool, &device).await.unwrap();
+
+    let mut vuln = Vulnerability::new("FK test".into(), "openvas".into(), Severity::Medium);
+    vuln.device_id = Some(device.id.clone());
+    vulnerabilities::insert(&pool, &vuln).await.unwrap();
+
+    // Delete the device - vulnerability should remain with device_id=NULL
+    devices::delete(&pool, &device.id).await.unwrap();
+
+    let fetched = vulnerabilities::get_by_id(&pool, &vuln.id).await.unwrap().unwrap();
+    assert!(fetched.device_id.is_none(), "device_id should be NULL after device deletion (ON DELETE SET NULL)");
+    assert_eq!(fetched.title, "FK test");
+}

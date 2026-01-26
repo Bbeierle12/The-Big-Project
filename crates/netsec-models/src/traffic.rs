@@ -54,4 +54,22 @@ mod tests {
         assert_eq!(back.src_ip, "10.0.0.1");
         assert_eq!(back.dst_port, 80);
     }
+
+    // A7: Constructor defaults
+    #[test]
+    fn test_traffic_flow_constructor_defaults() {
+        let flow = TrafficFlow::new("10.0.0.1".into(), 1234, "10.0.0.2".into(), 443, "tcp".into());
+        assert_eq!(flow.src_ip, "10.0.0.1");
+        assert_eq!(flow.src_port, 1234);
+        assert_eq!(flow.dst_ip, "10.0.0.2");
+        assert_eq!(flow.dst_port, 443);
+        assert_eq!(flow.protocol, "tcp");
+        assert_eq!(flow.bytes_sent, 0);
+        assert_eq!(flow.bytes_received, 0);
+        assert_eq!(flow.packets_sent, 0);
+        assert_eq!(flow.packets_received, 0);
+        uuid::Uuid::parse_str(&flow.id).expect("id should be valid UUID");
+        assert!(!flow.first_seen.is_empty());
+        assert!(!flow.last_seen.is_empty());
+    }
 }

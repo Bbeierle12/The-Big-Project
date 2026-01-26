@@ -75,4 +75,29 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert!(records[0].get("host").is_none());
     }
+
+    // C1: Malformed input
+    #[test]
+    fn test_zeek_no_fields_header() {
+        let data = "#separator \\x09\n#types\ttime\tstring\n1705312800.000000\tCk1234\n";
+        let records = parse_zeek_log(data);
+        // Without #fields line, data lines are skipped
+        assert!(records.is_empty());
+    }
+
+    #[test]
+    fn test_zeek_empty_input() {
+        let records = parse_zeek_log("");
+        assert!(records.is_empty());
+    }
+
+    // C2: All-dash values
+    #[test]
+    fn test_zeek_all_dash_values() {
+        let data = "#fields\tts\tuid\thost\n-\t-\t-\n";
+        let records = parse_zeek_log(data);
+        assert_eq!(records.len(), 1);
+        // All values are "-", so all should be omitted
+        assert!(records[0].is_empty());
+    }
 }

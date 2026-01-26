@@ -137,4 +137,27 @@ mod tests {
         assert_eq!(flows[0].bytes_sent, 300);
         assert_eq!(flows[0].packets_sent, 2);
     }
+
+    // C1: Malformed input
+    #[test]
+    fn test_pcap_malformed_json() {
+        let flows = extract_flows("this is not json");
+        assert!(flows.is_empty());
+    }
+
+    // C2: Single packet
+    #[test]
+    fn test_pcap_single_packet() {
+        let json = r#"[
+            {"src_ip":"10.0.0.5","dst_ip":"10.0.0.6","src_port":54321,"dst_port":443,"protocol":"tcp","bytes":64,"timestamp":"2024-01-15T10:00:00Z"}
+        ]"#;
+        let flows = extract_flows(json);
+        assert_eq!(flows.len(), 1);
+        assert_eq!(flows[0].packets_sent, 1);
+        assert_eq!(flows[0].bytes_sent, 64);
+        assert_eq!(flows[0].src_ip, "10.0.0.5");
+        assert_eq!(flows[0].dst_ip, "10.0.0.6");
+        assert_eq!(flows[0].src_port, 54321);
+        assert_eq!(flows[0].dst_port, 443);
+    }
 }
