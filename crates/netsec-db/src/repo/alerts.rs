@@ -75,6 +75,20 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     Ok(result.rows_affected() > 0)
 }
 
+pub async fn list_by_device_ip_since(
+    pool: &SqlitePool,
+    device_ip: &str,
+    since: &str,
+) -> Result<Vec<Alert>, sqlx::Error> {
+    sqlx::query_as::<_, Alert>(
+        "SELECT * FROM alerts WHERE device_ip = ? AND created_at >= ? ORDER BY created_at DESC",
+    )
+    .bind(device_ip)
+    .bind(since)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
     let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM alerts")
         .fetch_one(pool)
