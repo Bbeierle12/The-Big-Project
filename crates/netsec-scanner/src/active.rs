@@ -10,7 +10,7 @@ use netsec_parsers::nmap::NmapScanResult;
 use sqlx::SqlitePool;
 
 use crate::fingerprint;
-use crate::ScannerResult;
+use crate::{ScannerError, ScannerResult};
 
 /// Configuration for an active scan.
 #[derive(Debug, Clone)]
@@ -23,6 +23,48 @@ pub struct ScanConfig {
     pub timing: u8,
     /// Optional port specification (e.g. "22,80,443" or "1-1024").
     pub ports: Option<String>,
+}
+
+impl ScanConfig {
+    /// Validate the scan configuration for safety and correctness.
+    ///
+    /// - Target must be non-empty and contain only valid IP/CIDR characters.
+    /// - Ports (if specified) must contain only digits, commas, and hyphens.
+    /// - Timing must be 0-5 (nmap -T flag range).
+    pub fn validate(&self) -> ScannerResult<()> {
+        if self.target.is_empty() {
+            return Err(ScannerError::Validation(
+                "target must not be empty".to_string(),
+            ));
+        }
+
+        for ch in self.target.chars() {
+            if !matches!(ch, '0'..='9' | 'a'..='f' | 'A'..='F' | '.' | ':' | '-' | '/') {
+                return Err(ScannerError::Validation(format!(
+                    "target contains invalid character: '{ch}'"
+                )));
+            }
+        }
+
+        if let Some(ref ports) = self.ports {
+            for ch in ports.chars() {
+                if !matches!(ch, '0'..='9' | ',' | '-') {
+                    return Err(ScannerError::Validation(format!(
+                        "ports specification contains invalid character: '{ch}'"
+                    )));
+                }
+            }
+        }
+
+        if self.timing > 5 {
+            return Err(ScannerError::Validation(format!(
+                "timing must be 0-5, got {}",
+                self.timing
+            )));
+        }
+
+        Ok(())
+    }
 }
 
 /// A host discovered during an active scan (intermediate representation).
@@ -709,5 +751,111 @@ mod tests {
 
         let event = rx.try_recv().unwrap();
         assert_eq!(event.event_type, EventType::DeviceDiscovered);
+    }
+
+    // ── ScanConfig::validate tests ──────────────────────────────────────
+
+    #[test]
+    fn test_validate_valid_ipv4() {
+        let config = ScanConfig {
+            target: "192.168.1.0/24".to_string(),
+            scan_type: ScanType::Discovery,
+            timing: 4,
+            ports: None,
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_valid_ipv6() {
+        let config = ScanConfig {
+            target: "fe80::1".to_string(),
+            scan_type: ScanType::Discovery,
+            timing: 3,
+            ports: None,
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_empty_target() {
+        let config = ScanConfig {
+            target: "".to_string(),
+            scan_type: ScanType::Discovery,
+            timing: 4,
+            ports: None,
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("target must not be empty"));
+    }
+
+    #[test]
+    fn test_validate_invalid_target_chars() {
+        // Semicolons (shell injection)
+        let config = ScanConfig {
+            target: "192.168.1.1; rm -rf /".to_string(),
+            scan_type: ScanType::Discovery,
+            timing: 4,
+            ports: None,
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid character"));
+
+        // Backticks (command substitution)
+        let config2 = ScanConfig {
+            target: "`whoami`".to_string(),
+            scan_type: ScanType::Discovery,
+            timing: 4,
+            ports: None,
+        };
+        assert!(config2.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_valid_ports() {
+        let config = ScanConfig {
+            target: "10.0.0.1".to_string(),
+            scan_type: ScanType::Port,
+            timing: 3,
+            ports: Some("22,80,443".to_string()),
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_invalid_ports() {
+        let config = ScanConfig {
+            target: "10.0.0.1".to_string(),
+            scan_type: ScanType::Port,
+            timing: 3,
+            ports: Some("22,http,443".to_string()),
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid character"));
+    }
+
+    #[test]
+    fn test_validate_timing_valid() {
+        for t in 0..=5u8 {
+            let config = ScanConfig {
+                target: "10.0.0.1".to_string(),
+                scan_type: ScanType::Discovery,
+                timing: t,
+                ports: None,
+            };
+            assert!(config.validate().is_ok(), "timing {t} should be valid");
+        }
+    }
+
+    #[test]
+    fn test_validate_timing_invalid() {
+        let config = ScanConfig {
+            target: "10.0.0.1".to_string(),
+            scan_type: ScanType::Discovery,
+            timing: 6,
+            ports: None,
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("timing must be 0-5"));
     }
 }

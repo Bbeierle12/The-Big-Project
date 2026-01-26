@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 class AlertCorrelator:
     """Correlates alerts from different tools targeting the same device/event."""
 
-    def __init__(self, correlation_window: int = 600) -> None:
+    def __init__(self, correlation_window: int = 600, max_devices: int = 5_000) -> None:
         self._window = timedelta(seconds=correlation_window)
+        self._max_devices = max_devices
         # device_ip -> list of (alert, correlation_id, timestamp)
         self._recent: dict[str, list[tuple[NormalizedAlert, str, datetime]]] = defaultdict(list)
 
@@ -28,6 +29,10 @@ class AlertCorrelator:
             return None
 
         now = datetime.now(timezone.utc)
+
+        if alert.device_ip not in self._recent and len(self._recent) >= self._max_devices:
+            self._evict_oldest_devices()
+
         device_alerts = self._recent[alert.device_ip]
 
         # Clean expired
@@ -53,6 +58,20 @@ class AlertCorrelator:
         new_correlation_id = uuid4().hex[:12]
         device_alerts.append((alert, new_correlation_id, now))
         return new_correlation_id
+
+    def _evict_oldest_devices(self) -> None:
+        """Evict the oldest 25% of devices by their latest activity timestamp."""
+        count_to_remove = len(self._recent) // 4 or 1
+        # For each device, find the max (latest) timestamp in its alert list
+        device_latest: dict[str, datetime] = {}
+        for ip, alerts in self._recent.items():
+            if alerts:
+                device_latest[ip] = max(ts for _, _, ts in alerts)
+            else:
+                device_latest[ip] = datetime.min.replace(tzinfo=timezone.utc)
+        sorted_ips = sorted(device_latest, key=lambda ip: device_latest[ip])
+        for ip in sorted_ips[:count_to_remove]:
+            del self._recent[ip]
 
     def cleanup(self) -> None:
         """Remove expired correlation data."""

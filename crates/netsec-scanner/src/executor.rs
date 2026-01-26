@@ -89,6 +89,8 @@ pub fn check_scan_privileges(scan_type: &ScanType) -> ScannerResult<()> {
 /// 4. Spawns nmap as a subprocess, capturing stdout.
 /// 5. Parses XML output via `netsec_parsers::nmap::parse_nmap_xml()`.
 pub async fn execute_nmap(config: &ScanConfig) -> ScannerResult<NmapScanResult> {
+    config.validate()?;
+
     let nmap_path = find_nmap_binary().ok_or_else(|| {
         ScannerError::NmapExecution(
             "nmap binary not found; install nmap or add it to PATH".to_string(),

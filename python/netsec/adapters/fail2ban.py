@@ -1,6 +1,7 @@
 """Fail2Ban intrusion prevention adapter."""
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
 from typing import Any
@@ -10,6 +11,20 @@ from netsec.adapters.process import check_binary, get_binary_version, run_comman
 from netsec.platform.paths import find_tool_binary
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_jail(jail: str) -> None:
+    """Validate a jail name to prevent command injection."""
+    if not re.match(r"^[a-zA-Z0-9_-]+$", jail):
+        raise ValueError(f"Invalid jail name: {jail!r}")
+
+
+def _validate_ip(ip: str) -> None:
+    """Validate an IP address to prevent command injection."""
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        raise ValueError(f"Invalid IP address: {ip!r}")
 
 
 class Adapter(BaseAdapter):
@@ -66,11 +81,13 @@ class Adapter(BaseAdapter):
                 return await self.parse_output(result.stdout, "status")
             case "jail_status":
                 jail = params.get("jail", "sshd")
+                _validate_jail(jail)
                 result = await run_command(f"{self._binary} status {jail}", timeout=10)
                 return await self.parse_output(result.stdout, "jail_status")
             case "banned_ips":
                 jail = params.get("jail", "")
                 if jail:
+                    _validate_jail(jail)
                     result = await run_command(f"{self._binary} get {jail} banned", timeout=10)
                 else:
                     result = await run_command(f"{self._binary} banned", timeout=10)
@@ -80,6 +97,8 @@ class Adapter(BaseAdapter):
                 ip = params.get("ip", "")
                 if not ip:
                     raise ValueError("IP address required")
+                _validate_jail(jail)
+                _validate_ip(ip)
                 result = await run_command(f"{self._binary} set {jail} banip {ip}", timeout=10)
                 return {"success": result.success, "output": result.stdout}
             case "unban":
@@ -87,6 +106,8 @@ class Adapter(BaseAdapter):
                 ip = params.get("ip", "")
                 if not ip:
                     raise ValueError("IP address required")
+                _validate_jail(jail)
+                _validate_ip(ip)
                 result = await run_command(f"{self._binary} set {jail} unbanip {ip}", timeout=10)
                 return {"success": result.success, "output": result.stdout}
             case _:

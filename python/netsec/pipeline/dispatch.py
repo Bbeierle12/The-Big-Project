@@ -1,6 +1,7 @@
 """Alert dispatch — send alerts to configured channels."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -68,11 +69,17 @@ class AlertDispatcher:
 
     async def _send_email(self, alert: NormalizedAlert, correlation_id: str | None) -> bool:
         """Send alert via email (SMTP)."""
+        return await asyncio.to_thread(
+            self._send_email_sync, self._dispatch_config, alert, correlation_id
+        )
+
+    @staticmethod
+    def _send_email_sync(cfg: Any, alert: NormalizedAlert, correlation_id: str | None) -> bool:
+        """Synchronous SMTP send — runs in a worker thread."""
         try:
             import smtplib
             from email.mime.text import MIMEText
 
-            cfg = self._dispatch_config
             body = (
                 f"Alert: {alert.title}\n"
                 f"Severity: {alert.severity}\n"

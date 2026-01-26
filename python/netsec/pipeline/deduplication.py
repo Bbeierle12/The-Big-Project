@@ -12,8 +12,9 @@ logger = logging.getLogger(__name__)
 class AlertDeduplicator:
     """Deduplicates alerts within a configurable time window."""
 
-    def __init__(self, window_seconds: int = 300) -> None:
+    def __init__(self, window_seconds: int = 300, max_size: int = 10_000) -> None:
         self._window = timedelta(seconds=window_seconds)
+        self._max_size = max_size
         # fingerprint -> (first_seen, last_seen, count)
         self._seen: dict[str, tuple[datetime, datetime, int]] = {}
 
@@ -39,8 +40,17 @@ class AlertDeduplicator:
                 self._seen[fp] = (now, now, 1)
                 return True, 1
 
+        if len(self._seen) >= self._max_size:
+            self._evict_oldest()
         self._seen[fp] = (now, now, 1)
         return True, 1
+
+    def _evict_oldest(self) -> None:
+        """Evict the oldest 25% of entries by last_seen timestamp."""
+        count_to_remove = len(self._seen) // 4 or 1
+        sorted_fps = sorted(self._seen, key=lambda fp: self._seen[fp][1])
+        for fp in sorted_fps[:count_to_remove]:
+            del self._seen[fp]
 
     def cleanup(self) -> int:
         """Remove expired entries. Returns number removed."""

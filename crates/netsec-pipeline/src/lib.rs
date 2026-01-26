@@ -23,6 +23,8 @@ pub enum PipelineError {
     Dispatch(String),
     #[error("event bus error: {0}")]
     EventBus(String),
+    #[error("validation error: {0}")]
+    Validation(String),
 }
 
 pub type PipelineResult<T> = Result<T, PipelineError>;
@@ -35,6 +37,38 @@ pub struct PipelineConfig {
     pub critical_ports: Vec<u16>,
     /// Threshold for high-count deduplication (reserved for future use).
     pub high_count_threshold: i64,
+}
+
+impl PipelineConfig {
+    /// Validate configuration bounds.
+    ///
+    /// - `correlation_window_secs` must be 0..=86400.
+    /// - `critical_ports` must have at most 100 entries.
+    /// - `high_count_threshold` must be >= 1.
+    pub fn validate(&self) -> PipelineResult<()> {
+        if self.correlation_window_secs < 0 || self.correlation_window_secs > 86400 {
+            return Err(PipelineError::Validation(format!(
+                "correlation_window_secs must be 0-86400, got {}",
+                self.correlation_window_secs
+            )));
+        }
+
+        if self.critical_ports.len() > 100 {
+            return Err(PipelineError::Validation(format!(
+                "critical_ports must have at most 100 entries, got {}",
+                self.critical_ports.len()
+            )));
+        }
+
+        if self.high_count_threshold < 1 {
+            return Err(PipelineError::Validation(format!(
+                "high_count_threshold must be >= 1, got {}",
+                self.high_count_threshold
+            )));
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for PipelineConfig {
@@ -70,15 +104,18 @@ impl Pipeline {
     }
 
     /// Create a pipeline with a custom config and DB + EventBus dispatch targets.
-    pub fn with_config(pool: SqlitePool, event_bus: EventBus, config: PipelineConfig) -> Self {
+    ///
+    /// Returns an error if the config fails validation.
+    pub fn with_config(pool: SqlitePool, event_bus: EventBus, config: PipelineConfig) -> PipelineResult<Self> {
+        config.validate()?;
         let db_target = dispatch::DatabaseTarget::new(pool.clone());
         let bus_target = dispatch::EventBusTarget::new(event_bus.clone());
-        Self {
+        Ok(Self {
             pool,
             event_bus,
             config,
             dispatch_targets: vec![Box::new(db_target), Box::new(bus_target)],
-        }
+        })
     }
 
     /// Add an additional dispatch target.
@@ -116,5 +153,56 @@ impl Pipeline {
         .await?;
 
         Ok(alert)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pipeline_config_valid_default() {
+        let config = PipelineConfig::default();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_config_invalid_window() {
+        let config = PipelineConfig {
+            correlation_window_secs: 86401,
+            ..PipelineConfig::default()
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("correlation_window_secs must be 0-86400"));
+    }
+
+    #[test]
+    fn test_pipeline_config_invalid_ports_count() {
+        let config = PipelineConfig {
+            critical_ports: (0..101).map(|i| i as u16).collect(),
+            ..PipelineConfig::default()
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("at most 100 entries"));
+    }
+
+    #[test]
+    fn test_pipeline_config_invalid_threshold() {
+        let config = PipelineConfig {
+            high_count_threshold: 0,
+            ..PipelineConfig::default()
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("high_count_threshold must be >= 1"));
+    }
+
+    #[test]
+    fn test_pipeline_config_negative_window() {
+        let config = PipelineConfig {
+            correlation_window_secs: -1,
+            ..PipelineConfig::default()
+        };
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("correlation_window_secs must be 0-86400"));
     }
 }

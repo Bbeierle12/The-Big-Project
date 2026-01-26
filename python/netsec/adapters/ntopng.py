@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import httpx
@@ -12,15 +13,15 @@ from netsec.adapters.process import check_binary
 logger = logging.getLogger(__name__)
 
 DEFAULT_API_URL = "http://127.0.0.1:3000"
-DEFAULT_API_USER = "admin"
-DEFAULT_API_PASS = "admin"
 
 
 class Adapter(BaseAdapter):
     def __init__(self) -> None:
         self._status = ToolStatus.UNKNOWN
         self._api_url = DEFAULT_API_URL
-        self._auth = (DEFAULT_API_USER, DEFAULT_API_PASS)
+        user = os.environ.get("NETSEC__NTOPNG__API_USER")
+        password = os.environ.get("NETSEC__NTOPNG__API_PASS")
+        self._auth = (user, password) if user and password else None
         self._client: httpx.AsyncClient | None = None
 
     def tool_info(self) -> ToolInfo:

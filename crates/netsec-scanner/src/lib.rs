@@ -21,6 +21,8 @@ pub enum ScannerError {
     PassiveParse(String),
     #[error("event bus error: {0}")]
     EventBus(String),
+    #[error("validation error: {0}")]
+    Validation(String),
 }
 
 pub type ScannerResult<T> = Result<T, ScannerError>;
