@@ -1,8 +1,13 @@
-//! SQLite database layer via sqlx with async support and compile-time checked queries.
+//! SQLite database layer via sqlx with async support.
 //!
-//! Provides repository traits and implementations for all 9 unified schema tables.
-//!
-//! Stub — full implementation in Phase 1.
+//! Provides:
+//! - Connection pool initialization
+//! - Schema migration from SQL files
+//! - Repository implementations for all 9 unified schema tables
 
-pub mod migration;
-pub mod repository;
+pub mod pool;
+pub mod migrate;
+pub mod repo;
+
+pub use pool::create_pool;
+pub use migrate::run_migrations;

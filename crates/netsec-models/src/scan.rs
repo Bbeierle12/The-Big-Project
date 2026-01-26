@@ -1,6 +1,6 @@
 //! Scan model types.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -15,6 +15,29 @@ pub enum ScanStatus {
     Cancelled,
 }
 
+impl ScanStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Running => "running",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s {
+            "pending" => Self::Pending,
+            "running" => Self::Running,
+            "completed" => Self::Completed,
+            "failed" => Self::Failed,
+            "cancelled" => Self::Cancelled,
+            _ => Self::Pending,
+        }
+    }
+}
+
 /// Scan type.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -26,18 +49,81 @@ pub enum ScanType {
     Custom,
 }
 
-/// A scan execution record.
+impl ScanType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Discovery => "discovery",
+            Self::Port => "port",
+            Self::Vulnerability => "vulnerability",
+            Self::Full => "full",
+            Self::Custom => "custom",
+        }
+    }
+
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s {
+            "discovery" => Self::Discovery,
+            "port" => Self::Port,
+            "vulnerability" => Self::Vulnerability,
+            "full" => Self::Full,
+            _ => Self::Custom,
+        }
+    }
+}
+
+/// A scan execution record (database row).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct Scan {
-    pub id: Uuid,
-    pub scan_type: ScanType,
+    pub id: String,
+    pub scan_type: String,
     pub tool: String,
     pub target: String,
-    pub status: ScanStatus,
+    pub status: String,
     pub progress: f64,
-    pub parameters: serde_json::Value,
-    pub results: serde_json::Value,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub parameters: String,
+    pub results: String,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub created_at: String,
+}
+
+impl Scan {
+    pub fn new(tool: String, target: String, scan_type: ScanType) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            scan_type: scan_type.as_str().to_string(),
+            tool,
+            target,
+            status: ScanStatus::Pending.as_str().to_string(),
+            progress: 0.0,
+            parameters: "{}".to_string(),
+            results: "{}".to_string(),
+            started_at: None,
+            completed_at: None,
+            created_at: Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scan_serde_roundtrip() {
+        let scan = Scan::new("nmap".into(), "192.168.1.0/24".into(), ScanType::Discovery);
+        let json = serde_json::to_string(&scan).unwrap();
+        let back: Scan = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tool, "nmap");
+        assert_eq!(back.scan_type, "discovery");
+        assert_eq!(back.status, "pending");
+    }
+
+    #[test]
+    fn test_scan_status_roundtrip() {
+        for s in [ScanStatus::Pending, ScanStatus::Running, ScanStatus::Completed, ScanStatus::Failed, ScanStatus::Cancelled] {
+            assert_eq!(ScanStatus::from_str_lossy(s.as_str()), s);
+        }
+    }
 }

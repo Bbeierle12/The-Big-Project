@@ -1,6 +1,8 @@
 //! Plugin system model types.
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Plugin categories.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -39,15 +41,63 @@ pub enum TriggerType {
     Interval,
 }
 
-/// A scheduled job record.
+impl TriggerType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Cron => "cron",
+            Self::Interval => "interval",
+        }
+    }
+
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s {
+            "cron" => Self::Cron,
+            _ => Self::Interval,
+        }
+    }
+}
+
+/// A scheduled job record (database row).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct ScheduledJob {
-    pub id: uuid::Uuid,
-    pub trigger_type: TriggerType,
-    pub trigger_args: serde_json::Value,
+    pub id: String,
+    pub trigger_type: String,
+    pub trigger_args: String,
     pub task_type: String,
-    pub task_params: serde_json::Value,
+    pub task_params: String,
     pub enabled: bool,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl ScheduledJob {
+    pub fn new(trigger_type: TriggerType, task_type: String) -> Self {
+        let now = Utc::now().to_rfc3339();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            trigger_type: trigger_type.as_str().to_string(),
+            trigger_args: "{}".to_string(),
+            task_type,
+            task_params: "{}".to_string(),
+            enabled: true,
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scheduled_job_serde_roundtrip() {
+        let job = ScheduledJob::new(TriggerType::Cron, "full_scan".into());
+        let json = serde_json::to_string(&job).unwrap();
+        let back: ScheduledJob = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.trigger_type, "cron");
+        assert_eq!(back.task_type, "full_scan");
+        assert!(back.enabled);
+    }
 }
