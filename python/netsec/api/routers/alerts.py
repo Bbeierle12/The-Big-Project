@@ -55,11 +55,14 @@ async def update_alert(
     body: AlertUpdate,
     service: AlertService = Depends(_get_alert_service),
 ) -> AlertOut:
-    """Update alert status."""
-    if body.status:
-        alert = await service.update_alert_status(alert_id, body.status)
-    else:
+    """Update alert fields (status, severity, and/or notes)."""
+    if body.status is None and body.severity is None and body.notes is None:
+        # No changes requested, just return current state
         alert = await service.get_alert(alert_id)
+    else:
+        alert = await service.update_alert(
+            alert_id, status=body.status, severity=body.severity, notes=body.notes
+        )
     if alert is None:
         raise HTTPException(status_code=404, detail="Alert not found")
     return AlertOut.model_validate(alert)

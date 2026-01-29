@@ -8,12 +8,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from netsec.core.config import get_settings
-from netsec.core.events import EventBus
+from netsec.core.events import Event, EventBus, EventType
 from netsec.core.logging import setup_logging
 from netsec.core.scheduler import Scheduler
-from netsec.db.session import init_db, close_db
+from netsec.db.session import init_db, close_db, get_session_context
 from netsec.adapters.registry import AdapterRegistry
 from netsec.api.websocket import register_ws_forwarding
+from netsec.services.monitoring_service import MonitoringService
 
 
 @asynccontextmanager
@@ -39,12 +40,73 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await registry.init_all()
     app.state.adapter_registry = registry
 
-    # Start scheduler
+    # Start scheduler with task handler
     scheduler = Scheduler()
+
+    # Create shared monitoring service state for tool health tracking
+    _tool_status_cache: dict[str, str] = {}
+
+    async def task_handler(task_type: str, task_params: dict) -> None:
+        """Handle scheduled tasks."""
+        async with get_session_context() as session:
+            if task_type == "device_availability_check":
+                service = MonitoringService(session, event_bus, registry)
+                service._previous_tool_status = {}  # Device check doesn't need tool state
+                await service.check_device_availability(
+                    offline_threshold_minutes=task_params.get("offline_threshold_minutes", 15)
+                )
+            elif task_type == "tool_health_check":
+                service = MonitoringService(session, event_bus, registry)
+                # Restore previous state for delta detection
+                from netsec.adapters.base import ToolStatus
+                service._previous_tool_status = {
+                    k: ToolStatus(v) for k, v in _tool_status_cache.items()
+                }
+                await service.check_tool_health()
+                # Save current state
+                _tool_status_cache.clear()
+                _tool_status_cache.update({
+                    k: v.value for k, v in service._previous_tool_status.items()
+                })
+            elif task_type == "scan":
+                # For future scheduled scans
+                pass
+
+    scheduler.set_task_handler(task_handler)
     await scheduler.start()
     app.state.scheduler = scheduler
 
+    # Register default monitoring jobs
+    scheduler.add_job(
+        name="Device Availability Monitor",
+        trigger_type="interval",
+        trigger_args={"minutes": 5},
+        task_type="device_availability_check",
+        task_params={"offline_threshold_minutes": 15},
+    )
+    scheduler.add_job(
+        name="Tool Health Monitor",
+        trigger_type="interval",
+        trigger_args={"minutes": 2},
+        task_type="tool_health_check",
+        task_params={},
+    )
+
+    # Publish system startup event
+    await event_bus.publish(Event(
+        type=EventType.SYSTEM_STARTUP,
+        source="app",
+        data={"version": "0.1.0"},
+    ))
+
     yield
+
+    # Publish system shutdown event
+    await event_bus.publish(Event(
+        type=EventType.SYSTEM_SHUTDOWN,
+        source="app",
+        data={},
+    ))
 
     # Shutdown
     await scheduler.stop()

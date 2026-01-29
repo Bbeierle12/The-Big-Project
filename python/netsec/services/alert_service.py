@@ -103,15 +103,49 @@ class AlertService:
         return list(result.scalars().all())
 
     async def update_alert_status(self, alert_id: str, status: str) -> Alert | None:
+        """Update alert status only (legacy method)."""
+        return await self.update_alert(alert_id, status=status)
+
+    async def update_alert(
+        self,
+        alert_id: str,
+        status: str | None = None,
+        severity: str | None = None,
+        notes: str | None = None,
+    ) -> Alert | None:
+        """Update alert fields (status, severity, and/or notes)."""
         alert = await self.get_alert(alert_id)
-        if alert:
+        if alert is None:
+            return None
+
+        changed = False
+        if status is not None and alert.status != status:
             alert.status = status
+            changed = True
+        if severity is not None and alert.severity != severity:
+            alert.severity = severity
+            changed = True
+        if notes is not None and alert.notes != notes:
+            alert.notes = notes
+            changed = True
+
+        if changed:
             await self.session.flush()
 
+            # Determine event type based on new status
+            if status == "resolved":
+                event_type = EventType.ALERT_RESOLVED
+            else:
+                event_type = EventType.ALERT_UPDATED
+
             await self.event_bus.publish(Event(
-                type=EventType.ALERT_UPDATED if status != "resolved" else EventType.ALERT_RESOLVED,
+                type=event_type,
                 source="alert_service",
-                data={"alert_id": alert.id, "status": status},
+                data={
+                    "alert_id": alert.id,
+                    "status": alert.status,
+                    "severity": alert.severity,
+                },
             ))
         return alert
 

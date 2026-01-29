@@ -1,0 +1,5 @@
+{
+  "name": "Archangel Netmap",
+  "description": "A cyberpunk-themed network topology visualizer and scanner featuring OUI fingerprinting simulation and interactive node management.",
+  "requestFramePermissions": []
+}

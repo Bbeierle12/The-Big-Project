@@ -28,3 +28,4 @@ class Alert(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     raw_data: Mapped[Optional[dict]] = mapped_column(JSON)
     correlation_id: Mapped[Optional[str]] = mapped_column(String(32), index=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text)  # User-added notes/comments

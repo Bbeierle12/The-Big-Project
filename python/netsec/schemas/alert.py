@@ -24,6 +24,7 @@ class AlertOut(BaseModel):
     last_seen: datetime
     raw_data: Optional[dict[str, Any]] = None
     correlation_id: Optional[str] = None
+    notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

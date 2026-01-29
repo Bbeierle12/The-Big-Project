@@ -68,7 +68,15 @@ class ScanService:
         try:
             scan.status = "running"
             scan.started_at = datetime.now(timezone.utc)
+            scan.progress = 0
             await self.session.flush()
+
+            # Emit progress event (scan started running)
+            await self.event_bus.publish(Event(
+                type=EventType.SCAN_PROGRESS,
+                source="scan_service",
+                data={"scan_id": scan.id, "progress": 0, "status": "running"},
+            ))
 
             # Determine task type
             task = self._map_scan_type_to_task(scan_type, tool)
