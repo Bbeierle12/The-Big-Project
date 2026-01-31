@@ -1,8 +1,8 @@
 
 import { ApiDevice, ApiAlert, ApiScan, ScanCreateParams, ToolExecuteParams, ApiToolInfo } from '../types';
 
-const API_BASE = 'http://127.0.0.1:8420/api';
-const WS_URL = 'ws://127.0.0.1:8420/ws';
+const API_BASE = 'http://127.0.0.1:8000/api';
+const WS_URL = 'ws://127.0.0.1:8000/ws';
 
 export class NetWatchApi {
   private static ws: WebSocket | null = null;
