@@ -21,6 +21,7 @@ dependencies = [
     "tomli>=2.0; python_version < '3.11'",
     "tomli-w>=1.0",
     "websockets>=13.0",
+    "pywinpty>=2.0; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]

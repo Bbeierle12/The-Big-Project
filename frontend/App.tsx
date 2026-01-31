@@ -7,7 +7,7 @@ import { Toolbar } from './components/Toolbar';
 import { ScanningOverlay } from './components/ScanningOverlay';
 import { NetworkCanvas } from './components/NetworkCanvas';
 import { InspectorPanel } from './components/InspectorPanel';
-import { Terminal } from './components/Terminal';
+import { ConsolePanel } from './components/ConsolePanel';
 import { VulnerabilityDashboard } from './components/VulnerabilityDashboard';
 
 import { useNetwork } from './hooks/useNetwork';
@@ -29,7 +29,7 @@ export default function NetworkMapper() {
   } = useNetwork();
   
   const { isScanning, scanProgress, scanNetwork } = useScanner(nodes, setNodes, setConnections, setSelectedIds);
-  const { logs, executeCommand } = usePentest(setNodes);
+  const { executeCommand } = usePentest(setNodes);
   
   const {
     mode, setMode, pan, isPanning, selectionBox,
@@ -85,9 +85,6 @@ export default function NetworkMapper() {
         
         {/* SCANNING OVERLAY */}
         <ScanningOverlay isScanning={isScanning} scanProgress={scanProgress} />
-
-        {/* KALI TERMINAL */}
-        <Terminal logs={logs} />
 
         {/* TOOLBAR */}
         <Toolbar 
@@ -156,11 +153,14 @@ export default function NetworkMapper() {
         )}
       </div>
 
+      {/* CONSOLE PANEL - Docked at bottom */}
+      <ConsolePanel />
+
       {/* DASHBOARD OVERLAY */}
       {showVulnDashboard && (
-        <VulnerabilityDashboard 
-          nodes={nodes} 
-          onClose={() => setShowVulnDashboard(false)} 
+        <VulnerabilityDashboard
+          nodes={nodes}
+          onClose={() => setShowVulnDashboard(false)}
         />
       )}
     </div>

@@ -73,7 +73,39 @@ export const useNetwork = () => {
         const devices = await NetWatchApi.getDevices();
         const newNodes = devices.map(d => mapApiDeviceToNode(d));
         if (newNodes.length > 0) {
+           // Position nodes in a radial layout around gateway
+           const gateway = newNodes.find(n => n.ip?.endsWith('.1')) || newNodes[0];
+           const others = newNodes.filter(n => n.id !== gateway?.id);
+
+           if (gateway) {
+             gateway.x = 400;
+             gateway.y = 200;
+             gateway.type = 'router';
+           }
+
+           // Position other nodes in a circle around gateway
+           others.forEach((node, i) => {
+             const angle = (2 * Math.PI * i) / others.length;
+             const radius = 180 + Math.random() * 60;
+             node.x = 400 + Math.cos(angle) * radius;
+             node.y = 350 + Math.sin(angle) * radius;
+           });
+
            setNodes(newNodes);
+
+           // Create connections from each device to gateway
+           if (gateway) {
+             const newConnections: Connection[] = others.map((node, i) => ({
+               id: `conn-${node.id}`,
+               from: gateway.id,
+               to: node.id,
+               traffic: Math.random() * 30,
+               type: 'wireless' as const,
+               speed: '100 Mbps'
+             }));
+             setConnections(newConnections);
+           }
+
            setIsApiConnected(true);
         }
       } catch (e) {
@@ -87,9 +119,40 @@ export const useNetwork = () => {
     const handleDeviceDiscovered = async (evt: WsDeviceEvent) => {
       try {
         const device = await NetWatchApi.getDevice(evt.device_id);
+        const newNode = mapApiDeviceToNode(device);
+
         setNodes(prev => {
           if (prev.find(n => n.id === device.id)) return prev;
-          return [...prev, mapApiDeviceToNode(device)];
+
+          // Find gateway to position relative to it
+          const gateway = prev.find(n => n.ip?.endsWith('.1') || n.type === 'router');
+          if (gateway) {
+            const angle = Math.random() * 2 * Math.PI;
+            const radius = 180 + Math.random() * 60;
+            newNode.x = gateway.x + Math.cos(angle) * radius;
+            newNode.y = gateway.y + 150 + Math.sin(angle) * radius;
+          }
+
+          return [...prev, newNode];
+        });
+
+        // Create connection to gateway (get gateway from updated nodes state)
+        setNodes(currentNodes => {
+          const gatewayNode = currentNodes.find(n => n.ip?.endsWith('.1') || n.type === 'router');
+          if (gatewayNode && device.id !== gatewayNode.id) {
+            setConnections(prev => {
+              if (prev.find(c => c.to === device.id)) return prev;
+              return [...prev, {
+                id: `conn-${device.id}`,
+                from: gatewayNode.id,
+                to: device.id,
+                traffic: Math.random() * 30,
+                type: 'wireless' as const,
+                speed: '100 Mbps'
+              }];
+            });
+          }
+          return currentNodes; // Don't change nodes, just reading
         });
       } catch (e) {
         console.warn('Failed to hydrate discovered device:', evt.device_id, e);

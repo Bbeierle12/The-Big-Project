@@ -81,8 +81,8 @@ class ScanService:
                 data={"scan_id": scan.id, "progress": 0, "status": "running"},
             ))
 
-            # Determine task type
-            task = self._map_scan_type_to_task(scan_type, tool)
+            # Determine task type (use explicit task if provided, otherwise map from scan_type)
+            task = (parameters or {}).pop("task", None) or self._map_scan_type_to_task(scan_type, tool)
             params = {"target": target, **(parameters or {})}
             result = await adapter.execute(task, params)
 
