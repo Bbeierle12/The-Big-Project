@@ -91,7 +91,7 @@ async def run_command(
         logger.warning("Command timed out after %ds: %s", timeout, cmd_str)
 
     result = ProcessResult(
-        returncode=proc.returncode or -1,
+        returncode=proc.returncode if proc.returncode is not None else -1,
         stdout=stdout.decode(errors="replace") if stdout else "",
         stderr=stderr.decode(errors="replace") if stderr else "",
         command=cmd_str,
@@ -125,9 +125,17 @@ async def check_binary(binary: str) -> str | None:
     return None
 
 
+def quote_path(path: str) -> str:
+    """Quote a path for shell commands if it contains spaces."""
+    if " " in path and not (path.startswith('"') and path.endswith('"')):
+        return f'"{path}"'
+    return path
+
+
 async def get_binary_version(binary: str, version_flag: str = "--version") -> str | None:
     """Get the version string from a binary."""
-    result = await run_command(f"{binary} {version_flag}", timeout=10)
+    quoted = quote_path(binary)
+    result = await run_command(f"{quoted} {version_flag}", timeout=10)
     if result.success:
         return result.stdout.strip().split("\n")[0]
     return None

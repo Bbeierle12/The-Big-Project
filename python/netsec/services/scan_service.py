@@ -13,6 +13,7 @@ from netsec.adapters.base import ToolStatus
 from netsec.adapters.registry import AdapterRegistry
 from netsec.core.events import Event, EventBus, EventType
 from netsec.models.scan import Scan
+from netsec.services.device_service import DeviceService
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,12 @@ class ScanService:
         session: AsyncSession,
         registry: AdapterRegistry,
         event_bus: EventBus,
+        device_service: DeviceService | None = None,
     ) -> None:
         self.session = session
         self.registry = registry
         self.event_bus = event_bus
+        self.device_service = device_service or DeviceService(session, event_bus)
 
     async def create_scan(
         self,
@@ -90,7 +93,15 @@ class ScanService:
                 scan.status = "completed"
                 scan.results = result
                 scan.result_summary = self._summarize_results(result)
-                scan.devices_found = len(result.get("hosts", []))
+
+                # Upsert discovered devices
+                hosts = result.get("hosts", [])
+                for host in hosts:
+                    try:
+                        await self.device_service.upsert_from_scan(host)
+                    except Exception as e:
+                        logger.warning("Failed to upsert device: %s", e)
+                scan.devices_found = len(hosts)
 
             scan.completed_at = datetime.now(timezone.utc)
             scan.progress = 100

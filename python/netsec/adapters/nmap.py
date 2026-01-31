@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from netsec.adapters.base import BaseAdapter, ToolCategory, ToolInfo, ToolStatus
-from netsec.adapters.process import check_binary, get_binary_version, run_command
+from netsec.adapters.process import check_binary, get_binary_version, quote_path, run_command
 from netsec.platform.paths import find_tool_binary
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,8 @@ class Adapter(BaseAdapter):
     async def health_check(self) -> ToolStatus:
         if not self._binary:
             return ToolStatus.UNAVAILABLE
-        result = await run_command(f"{self._binary} --version", timeout=10)
+        quoted = quote_path(self._binary)
+        result = await run_command(f"{quoted} --version", timeout=10)
         self._status = ToolStatus.AVAILABLE if result.success else ToolStatus.ERROR
         return self._status
 
@@ -88,7 +89,7 @@ class Adapter(BaseAdapter):
 
     def _build_command(self, task: str, params: dict[str, Any]) -> str:
         target = params["target"]
-        binary = self._binary
+        binary = quote_path(self._binary) if self._binary else "nmap"
 
         # Always output XML to stdout
         base = f"{binary} -oX -"
