@@ -13,7 +13,7 @@ use crate::PipelineResult;
 /// Result of the deduplication check.
 pub enum DeduplicationResult {
     /// An existing alert was found; its count has been incremented.
-    Duplicate(Alert),
+    Duplicate(Box<Alert>),
     /// No existing alert matches this fingerprint.
     New,
 }
@@ -33,7 +33,7 @@ pub async fn deduplicate(
             alerts::increment_count(pool, &found.id, &now).await?;
             found.count += 1;
             found.updated_at = now;
-            Ok(DeduplicationResult::Duplicate(found))
+            Ok(DeduplicationResult::Duplicate(Box::new(found)))
         }
         None => Ok(DeduplicationResult::New),
     }
@@ -84,7 +84,7 @@ mod tests {
         let result = deduplicate(&pool, &normalized).await.unwrap();
         match result {
             DeduplicationResult::Duplicate(a) => assert_eq!(a.count, 2),
-            DeduplicationResult::New => panic!("Expected duplicate"),
+            _ => panic!("Expected duplicate"),
         }
     }
 

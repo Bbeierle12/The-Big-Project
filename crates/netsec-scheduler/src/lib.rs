@@ -83,7 +83,7 @@ pub fn parse_cron_args(args: &str) -> SchedulerResult<String> {
 ///
 /// For unrecognized patterns, returns `false`.
 pub fn is_cron_due(cron_expr: &str, now: &DateTime<Utc>) -> bool {
-    let parts: Vec<&str> = cron_expr.trim().split_whitespace().collect();
+    let parts: Vec<&str> = cron_expr.split_whitespace().collect();
     if parts.len() != 5 {
         return false;
     }

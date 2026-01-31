@@ -129,7 +129,7 @@ impl Pipeline {
         // Stage 2: Deduplicate
         let dedup_result = deduplication::deduplicate(&self.pool, &normalized).await?;
         if let deduplication::DeduplicationResult::Duplicate(existing) = dedup_result {
-            return Ok(existing);
+            return Ok(*existing);
         }
 
         // Stage 3: Correlate

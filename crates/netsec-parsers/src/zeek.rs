@@ -73,7 +73,7 @@ mod tests {
         let data = "#fields\tts\tuid\thost\n1705312800.000000\tCk1234\t-\n";
         let records = parse_zeek_log(data);
         assert_eq!(records.len(), 1);
-        assert!(records[0].get("host").is_none());
+        assert!(!records[0].contains_key("host"));
     }
 
     // C1: Malformed input
