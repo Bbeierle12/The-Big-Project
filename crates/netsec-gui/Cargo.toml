@@ -1,0 +1,52 @@
+[package]
+name = "netsec-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "NetWatch desktop application - network security monitoring GUI"
+
+[[bin]]
+name = "netwatch"
+path = "src/main.rs"
+
+[dependencies]
+# GUI framework
+iced = { version = "0.13", features = ["tokio", "canvas", "advanced"] }
+
+# Terminal emulation
+vt100 = "0.15"
+netsec-pty = { path = "../netsec-pty" }
+
+# Async runtime
+tokio.workspace = true
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# WebSocket client
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+
+# Internal crates
+netsec-models.workspace = true
+netsec-db.workspace = true
+netsec-events.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+thiserror.workspace = true
+
+# Desktop integration
+notify-rust = "4"
+directories = "5"
+toml = "0.8"
+
+# Global hotkeys
+global-hotkey = "0.6"

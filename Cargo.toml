@@ -13,6 +13,8 @@ members = [
     "crates/netsec-core",
     "crates/netsec-python",
     "crates/netsec-ffi",
+    "crates/netsec-pty",
+    "crates/netsec-gui",
 ]
 
 [workspace.package]
@@ -32,6 +34,7 @@ netsec-scheduler = { path = "crates/netsec-scheduler" }
 netsec-platform = { path = "crates/netsec-platform" }
 netsec-threat = { path = "crates/netsec-threat" }
 netsec-core = { path = "crates/netsec-core" }
+netsec-pty = { path = "crates/netsec-pty" }
 
 # Shared external dependencies
 serde = { version = "1", features = ["derive"] }

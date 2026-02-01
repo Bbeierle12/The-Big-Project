@@ -1,0 +1,12 @@
+[package]
+name = "netsec-pty"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Cross-platform PTY abstraction for terminal emulation"
+
+[dependencies]
+portable-pty = "0.8"
+tokio = { version = "1", features = ["sync", "io-util", "rt"] }
+thiserror.workspace = true
+tracing.workspace = true

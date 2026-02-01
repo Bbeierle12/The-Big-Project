@@ -144,3 +144,21 @@ export interface Connection {
   ssid?: string;
   speed?: string;
 }
+
+// ============ Terminal types ============
+
+export interface ShellInfo {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export type TerminalSessionState = 'idle' | 'creating' | 'connected' | 'error' | 'disconnected';
+
+export interface TerminalTab {
+  id: string;
+  sessionId: string | null;
+  shell: ShellInfo | null;
+  state: TerminalSessionState;
+  title: string;
+}
