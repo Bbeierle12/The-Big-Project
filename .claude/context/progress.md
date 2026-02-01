@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-01-31T07:05:47Z
-version: 1.0
+last_updated: 2026-02-01T02:21:43Z
+version: 1.1
 author: Claude Code PM System
 ---
 
@@ -10,7 +10,7 @@ author: Claude Code PM System
 ## Current State
 
 **Branch:** main
-**Latest Commit:** `cf36910` - feat: integrate frontend and implement missing WS event publishers
+**Latest Commit:** `edc925d` - feat: add interactive terminal component with WebSocket support
 **Repository:** https://github.com/Bbeierle12/The-Big-Project.git
 
 ## Completed Phases
@@ -44,29 +44,42 @@ author: Claude Code PM System
 - Memory bounds on dedup/correlation
 - Multi-stage Dockerfile
 
-### Phase 6: Frontend Integration (Latest)
+### Phase 6: Frontend Integration
 - Integrated ArchAngel frontend into repo
-- Fixed API client payload mismatches:
-  - `launchScan()` now sends `{scan_type, tool, target}`
-  - `executeTool()` now sends `{task, params}`
-- Implemented WebSocket hydration (fetch full device on event)
+- Fixed API client payload mismatches
+- Implemented WebSocket hydration
 - Added `notes` field to Alert model with migration
-- Implemented missing WS event publishers:
-  - `system.startup/shutdown`
-  - `scan.progress`
-  - `device.offline` (via monitoring service)
-  - `tool.online/offline` (via health monitoring)
+- Implemented missing WS event publishers
 - Created monitoring service with scheduled jobs
+
+### Phase 7: Native Desktop Application (Latest)
+- **netsec-gui crate** - Complete Iced 0.13 desktop application
+  - Network canvas with node visualization
+  - Device inspector panel with port/vulnerability details
+  - All dashboard views (Alerts, Scans, Traffic, Tools, Scheduler, Settings)
+  - Modal overlays using Iced Stack widget
+  - Toast notification system with auto-dismiss
+  - Confirmation dialogs for destructive actions
+- **netsec-pty crate** - PTY/terminal emulation
+  - Cross-platform shell detection (PowerShell, cmd, bash, zsh)
+  - VT100 terminal emulation
+  - Multi-tab terminal support
+- **Desktop integration**
+  - Native OS notifications (notify-rust)
+  - Settings persistence to TOML file
+  - Global hotkeys (Ctrl+Shift+N/S/R/A)
+  - Auto-refresh timer based on settings
+- **API client** - Full REST client with async reqwest
+- **WebSocket client** - Real-time event streaming with tokio-tungstenite
 
 ## Recent Commits
 
 ```
-cf36910 feat: integrate frontend and implement missing WS event publishers
-905bcf9 ad
-57cfecc feat: implement Phase 5 security hardening and Rust core wiring
-8446de1 feat(scanner): implement full scan functionality with nmap execution
-308e6c6 feat: implement device fingerprinting and classification
-0c39529 feat: implement alert processing pipeline and event bus enhancements
+edc925d feat: add interactive terminal component with WebSocket support
+4aa9b75 feat(frontend): add toolbar labels and expand nmap scan options
+e927ab4 fix(frontend): correct API URL and add Vite entry point
+d02b44f fix: wire up real scanning and device discovery
+87ced55 docs: add Claude Code project context documentation
 ```
 
 ## Current Working State
@@ -78,7 +91,9 @@ cf36910 feat: integrate frontend and implement missing WS event publishers
 - Scan execution (nmap)
 - Alert processing pipeline
 - Tool health monitoring
-- Frontend visualization (React)
+- Frontend visualization (React web)
+- **Native desktop application (Rust/Iced)**
+- **Embedded terminal with PTY**
 
 ### Database
 - SQLite database at `netsec.db`
@@ -86,15 +101,16 @@ cf36910 feat: integrate frontend and implement missing WS event publishers
 - All tables created and functional
 
 ### Known Issues
-1. **FastAPI integration tests** - Delete endpoint returns 204 with response model (FastAPI rejects this)
-2. **Clippy warnings** - `large_enum_variant` in deduplication.rs, unnecessary `.trim()` in scheduler
+1. **FastAPI integration tests** - Delete endpoint returns 204 with response model
+2. **Clippy warnings** - Unused code warnings in netsec-gui (expected, not all features used yet)
+3. **Global hotkeys** - May require elevated permissions on some platforms
 
 ## Immediate Next Steps
 
-1. **Fix FastAPI 204 issue** - Remove response model from delete endpoints
-2. **Verify frontend builds** - Run `npm run build` in frontend/
-3. **Test end-to-end** - Start backend, open frontend, run a scan
-4. **Docker build** - Test `docker build -f deploy/docker/Dockerfile .`
+1. **Test desktop app end-to-end** - Run `cargo run -p netsec-gui` with backend running
+2. **Wire terminal to backend** - Connect PTY terminal to backend terminal API
+3. **Add loading states** - Show loading indicators during API calls
+4. **Package for distribution** - Create installers for Windows/macOS/Linux
 
 ## Test Status
 
@@ -104,3 +120,7 @@ cf36910 feat: integrate frontend and implement missing WS event publishers
 | Python unit tests | 9 passed | With PYTHONPATH=python |
 | Python integration | 6 failing | FastAPI 204 + response model issue |
 | Frontend TypeScript | Compiles | No runtime tests yet |
+| netsec-gui | Compiles | 67 warnings (mostly unused code) |
+
+## Update History
+- 2026-02-01: Added Phase 7 - Native Desktop Application (netsec-gui, netsec-pty)

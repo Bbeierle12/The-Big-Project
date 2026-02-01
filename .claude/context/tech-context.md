@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-01-31T07:05:47Z
-version: 1.0
+last_updated: 2026-02-01T02:21:43Z
+version: 1.1
 author: Claude Code PM System
 ---
 
@@ -63,6 +63,19 @@ author: Claude Code PM System
 | tracing | 0.1 | Structured logging |
 | pyo3 | 0.22 | Python bindings |
 | quick-xml | 0.36 | XML parsing (nmap output) |
+
+### Desktop Application (netsec-gui)
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| iced | 0.13 | Native GUI framework (Elm architecture) |
+| reqwest | 0.12 | Async HTTP client |
+| tokio-tungstenite | 0.24 | WebSocket client |
+| futures-util | 0.3 | Async utilities |
+| notify-rust | 4 | Native OS notifications |
+| directories | 5 | Cross-platform config paths |
+| toml | 0.8 | Settings file format |
+| global-hotkey | 0.6 | System-wide keyboard shortcuts |
+| vt100 | 0.15 | Terminal emulation |
 
 ## Frontend Dependencies
 

@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-01-31T07:05:47Z
-version: 1.0
+last_updated: 2026-02-01T02:21:43Z
+version: 1.1
 author: Claude Code PM System
 ---
 
@@ -13,7 +13,7 @@ author: Claude Code PM System
 The Big Project/
 ├── .claude/              # Claude Code configuration and context
 ├── config/               # Configuration files (default.toml, etc.)
-├── crates/               # Rust workspace crates
+├── crates/               # Rust workspace crates (11 crates)
 ├── deploy/               # Deployment configurations (Docker, etc.)
 ├── dotnet/               # .NET components (scaffolded)
 ├── frontend/             # React/TypeScript web UI (ArchAngel)
@@ -95,7 +95,61 @@ crates/
 ├── netsec-scheduler/     # Cron job scheduling
 ├── netsec-threat/        # Threat intelligence
 ├── netsec-python/        # PyO3 bindings for Python
-└── netsec-ffi/           # C FFI for .NET/other consumers
+├── netsec-ffi/           # C FFI for .NET/other consumers
+├── netsec-pty/           # PTY/terminal emulation (NEW)
+└── netsec-gui/           # Iced desktop application (NEW)
+```
+
+## Desktop Application Structure (`crates/netsec-gui/`)
+
+```
+netsec-gui/
+├── src/
+│   ├── main.rs           # Application entry point
+│   ├── app.rs            # Main application state and logic (1850+ lines)
+│   ├── message.rs        # Elm-style message types
+│   ├── theme.rs          # Color palette and styling
+│   ├── api/              # Backend API client
+│   │   ├── mod.rs
+│   │   ├── client.rs     # REST API client (reqwest)
+│   │   ├── models.rs     # API data models
+│   │   └── websocket.rs  # WebSocket client (tokio-tungstenite)
+│   ├── desktop/          # Desktop integration
+│   │   ├── mod.rs
+│   │   ├── hotkeys.rs    # Global hotkey support
+│   │   ├── notifications.rs # Native OS notifications
+│   │   └── persistence.rs # Settings save/load (TOML)
+│   ├── state/            # Application state
+│   │   ├── mod.rs
+│   │   ├── network.rs    # Network canvas state
+│   │   └── terminal.rs   # Terminal emulation state
+│   └── views/            # UI views (Iced widgets)
+│       ├── mod.rs
+│       ├── alerts.rs     # Alerts dashboard
+│       ├── canvas.rs     # Network topology canvas
+│       ├── header.rs     # Application header bar
+│       ├── inspector.rs  # Device detail panel
+│       ├── scans.rs      # Scans dashboard
+│       ├── scheduler.rs  # Scheduled jobs view
+│       ├── settings.rs   # Settings panel
+│       ├── terminal.rs   # Embedded terminal view
+│       ├── toolbar.rs    # Left toolbar
+│       ├── tools.rs      # Tools dashboard
+│       ├── traffic.rs    # Traffic flows view
+│       ├── ui_components.rs # Toasts, dialogs, badges
+│       └── vuln_dashboard.rs # Vulnerability dashboard
+└── Cargo.toml
+```
+
+## PTY Library Structure (`crates/netsec-pty/`)
+
+```
+netsec-pty/
+├── src/
+│   ├── lib.rs            # Library exports
+│   ├── session.rs        # PTY session management
+│   └── shell.rs          # Shell detection and launching
+└── Cargo.toml
 ```
 
 ## Frontend Structure (`frontend/`)

@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-01-31T07:05:47Z
-version: 1.0
+last_updated: 2026-02-01T02:21:43Z
+version: 1.1
 author: Claude Code PM System
 ---
 
@@ -13,7 +13,8 @@ NetSec Orchestrator is a unified network security platform that integrates multi
 
 - **Python FastAPI backend** for REST API and tool orchestration
 - **Rust core** for performance-critical operations
-- **React frontend** (ArchAngel) for visual network monitoring
+- **React frontend** (ArchAngel) for web-based network monitoring
+- **Native desktop application** (Iced/Rust) for standalone monitoring
 - **SQLite/PostgreSQL** for data persistence
 
 ## Feature Summary
@@ -75,7 +76,7 @@ NetSec Orchestrator is a unified network security platform that integrates multi
 | OSSEC | `ossec.py` | Host-based IDS |
 | Pi.Alert | `pialert.py` | Network presence |
 
-### Frontend Components
+### Web Frontend Components (React)
 
 | Component | Purpose |
 |-----------|---------|
@@ -86,6 +87,27 @@ NetSec Orchestrator is a unified network security platform that integrates multi
 | InspectorPanel | Device detail view |
 | VulnerabilityDashboard | Vulnerability summary |
 | ScanningOverlay | Scan progress indicator |
+
+### Native Desktop Application (Iced/Rust)
+
+| View | Purpose |
+|------|---------|
+| Network Canvas | Device topology with zoom/pan |
+| Inspector Panel | Device details, ports, vulnerabilities |
+| Alerts Dashboard | Alert list with filtering, acknowledge/resolve |
+| Scans Dashboard | Scan history with re-run capability |
+| Traffic Dashboard | Network flow visualization |
+| Tools Dashboard | Tool health status and execution |
+| Scheduler Dashboard | Scheduled job management |
+| Settings Panel | API config, appearance, notifications |
+| Embedded Terminal | Multi-tab PTY terminal with shell access |
+
+#### Desktop Integration Features
+- **Native notifications** - OS-level alerts for events
+- **Global hotkeys** - Ctrl+Shift+N/S/R/A shortcuts
+- **Settings persistence** - TOML config in user directory
+- **Auto-refresh** - Configurable data refresh interval
+- **Toast notifications** - In-app notifications with auto-dismiss
 
 ## Integration Points
 
@@ -119,16 +141,25 @@ NetSec Orchestrator is a unified network security platform that integrates multi
 - Device discovery and tracking
 - Nmap scan execution and parsing
 - Alert pipeline (normalize, dedup, correlate, classify)
-- Frontend network visualization
+- Frontend network visualization (React web)
+- **Native desktop application (Iced/Rust)**
+- **Embedded terminal with PTY support**
+- **Native OS notifications**
+- **Settings persistence**
 - Scheduled monitoring jobs
 
 ⚠️ **Partial**
 - Other tool adapters (framework exists, not all tested)
 - Traffic analysis (endpoint exists, limited functionality)
 - Vulnerability aggregation
+- Global hotkeys (platform-dependent)
 
 ❌ **Not Yet Implemented**
 - User authentication (API key only)
 - Email/webhook notifications (framework exists)
 - Report generation
 - Cloud infrastructure support
+- Desktop app installers/packaging
+
+## Update History
+- 2026-02-01: Added native desktop application (netsec-gui)
