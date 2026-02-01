@@ -1,0 +1,178 @@
+//! CanvasWebview - Wry webview manager for the React NetworkCanvas.
+//!
+//! This module manages the lifecycle of a Wry webview that renders
+//! the React NetworkCanvas component within the Iced application.
+
+use std::sync::mpsc;
+use wry::{WebView, WebViewBuilder, Rect, dpi::LogicalPosition, dpi::LogicalSize};
+use crate::webview::ipc::{NetworkStateJson, WebviewEvent};
+
+/// Error type for webview operations.
+#[derive(Debug, thiserror::Error)]
+pub enum WebviewError {
+    #[error("Wry error: {0}")]
+    Wry(#[from] wry::Error),
+    #[error("JSON serialization error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("Webview not ready")]
+    NotReady,
+}
+
+/// Manages the Wry webview for the NetworkCanvas.
+pub struct CanvasWebview {
+    webview: WebView,
+    is_ready: bool,
+    bounds: Rect,
+}
+
+impl CanvasWebview {
+    /// Create a new CanvasWebview with the given parent window.
+    ///
+    /// On Windows, `parent` should be HWND.
+    /// The webview will be created but not immediately visible.
+    #[cfg(target_os = "windows")]
+    pub fn new(
+        parent_hwnd: isize,
+        event_tx: mpsc::Sender<WebviewEvent>,
+    ) -> Result<Self, WebviewError> {
+
+        // Build the webview with the embedded HTML
+        let html_content = include_str!("../../assets/webview/index.html");
+
+        // Create the IPC handler closure
+        let webview = WebViewBuilder::new()
+            .with_html(html_content)
+            .with_transparent(true)
+            .with_bounds(Rect {
+                position: LogicalPosition::new(0.0, 0.0).into(),
+                size: LogicalSize::new(800.0, 600.0).into(),
+            })
+            .with_ipc_handler(move |request| {
+                // The request body contains the JSON message from JavaScript
+                let msg_str = request.body();
+
+                // Parse JSON message from JavaScript
+                match serde_json::from_str::<WebviewEvent>(msg_str) {
+                    Ok(event) => {
+                        if let Err(e) = event_tx.send(event) {
+                            tracing::error!("Failed to send webview event: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse webview message: {} - {}", e, msg_str);
+                    }
+                }
+            })
+            .build_as_child(&ParentWindow(parent_hwnd))?;
+
+        Ok(Self {
+            webview,
+            is_ready: false,
+            bounds: Rect {
+                position: LogicalPosition::new(0.0, 0.0).into(),
+                size: LogicalSize::new(800.0, 600.0).into(),
+            },
+        })
+    }
+
+    /// Create a new CanvasWebview (non-Windows platforms).
+    #[cfg(not(target_os = "windows"))]
+    pub fn new(
+        _parent_hwnd: isize,
+        _event_tx: mpsc::Sender<WebviewEvent>,
+    ) -> Result<Self, WebviewError> {
+        // For non-Windows platforms, we'll need platform-specific handling
+        // This is a placeholder that returns an error for now
+        Err(WebviewError::Wry(wry::Error::UnsupportedPlatform))
+    }
+
+    /// Mark the webview as ready (called when we receive Ready event).
+    pub fn set_ready(&mut self) {
+        self.is_ready = true;
+        tracing::info!("Canvas webview is ready");
+    }
+
+    /// Check if the webview is ready to receive state updates.
+    pub fn is_ready(&self) -> bool {
+        self.is_ready
+    }
+
+    /// Update the network state in the webview.
+    pub fn update_state(&self, state: &NetworkStateJson) -> Result<(), WebviewError> {
+        if !self.is_ready {
+            return Err(WebviewError::NotReady);
+        }
+
+        let json = serde_json::to_string(state)?;
+        let script = format!("window.updateNetworkState({})", json);
+
+        self.webview.evaluate_script(&script)?;
+        Ok(())
+    }
+
+    /// Set the bounds of the webview within the parent window.
+    pub fn set_bounds(&mut self, x: f64, y: f64, width: f64, height: f64) -> Result<(), WebviewError> {
+        let new_bounds = Rect {
+            position: LogicalPosition::new(x, y).into(),
+            size: LogicalSize::new(width, height).into(),
+        };
+
+        // Only update if bounds have changed
+        if self.bounds.position != new_bounds.position || self.bounds.size != new_bounds.size {
+            self.bounds = new_bounds;
+            self.webview.set_bounds(self.bounds)?;
+        }
+
+        Ok(())
+    }
+
+    /// Get the current bounds.
+    pub fn bounds(&self) -> &Rect {
+        &self.bounds
+    }
+
+    /// Focus the webview.
+    pub fn focus(&self) -> Result<(), WebviewError> {
+        self.webview.focus()?;
+        Ok(())
+    }
+
+    /// Execute arbitrary JavaScript in the webview.
+    pub fn evaluate_script(&self, script: &str) -> Result<(), WebviewError> {
+        self.webview.evaluate_script(script)?;
+        Ok(())
+    }
+}
+
+/// Wrapper for parent window handle on Windows.
+#[cfg(target_os = "windows")]
+struct ParentWindow(isize);
+
+#[cfg(target_os = "windows")]
+impl raw_window_handle::HasWindowHandle for ParentWindow {
+    fn window_handle(&self) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
+        use raw_window_handle::{RawWindowHandle, Win32WindowHandle};
+        use std::num::NonZeroIsize;
+
+        let handle = Win32WindowHandle::new(
+            NonZeroIsize::new(self.0).expect("Invalid HWND")
+        );
+
+        let raw = RawWindowHandle::Win32(handle);
+        // Safety: The handle is valid for the lifetime of the parent window
+        Ok(unsafe { raw_window_handle::WindowHandle::borrow_raw(raw) })
+    }
+}
+
+/// Factory function to create the webview assets directory path.
+#[allow(dead_code)]
+pub fn assets_dir() -> std::path::PathBuf {
+    // In development, assets are in the crate's assets directory
+    // In production, they would be embedded or in the executable's directory
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    exe_dir.join("assets").join("webview")
+}

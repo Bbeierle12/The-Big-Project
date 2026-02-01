@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Network Canvas</title>
+    <style>
+      /* Critical styles for immediate rendering */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body, #root {
+        width: 100%; height: 100%; overflow: hidden;
+        background-color: #000;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      /* Color utilities */
+      .bg-black { background-color: #000; }
+      .text-cyan-400 { color: #22d3ee; }
+      .text-cyan-500 { color: #06b6d4; }
+      .text-slate-200 { color: #e2e8f0; }
+      .text-slate-500 { color: #64748b; }
+      .text-red-500 { color: #ef4444; }
+      .text-amber-500 { color: #f59e0b; }
+
+      /* Animations */
+      @keyframes spin-slow { to { transform: rotate(360deg); } }
+      @keyframes pulse-ring { 50% { opacity: 0.5; } }
+      @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+      @keyframes dash { to { stroke-dashoffset: -16; } }
+
+      .animate-spin-slow { animation: spin-slow 20s linear infinite; }
+      .animate-pulse-ring { animation: pulse-ring 2s ease-in-out infinite; }
+      .animate-ping { animation: ping 1s ease-out infinite; }
+      .animate-spin { animation: spin-slow 3s linear infinite; }
+      .animate-pulse { animation: pulse-ring 2s ease-in-out infinite; }
+      .animate-dash { animation: dash 0.5s linear infinite; }
+
+      /* Utilities */
+      .relative { position: relative; }
+      .absolute { position: absolute; }
+      .h-full { height: 100%; }
+      .w-full { width: 100%; }
+      .overflow-hidden { overflow: hidden; }
+      .z-10 { z-index: 10; }
+      .top-2 { top: 0.5rem; }
+      .right-2 { right: 0.5rem; }
+      .rounded { border-radius: 0.25rem; }
+      .px-3 { padding: 0 0.75rem; }
+      .py-1 { padding: 0.25rem 0; }
+      .text-xs { font-size: 0.75rem; }
+      .font-mono { font-family: inherit; }
+      .font-bold { font-weight: 700; }
+      .font-black { font-weight: 900; }
+      .uppercase { text-transform: uppercase; }
+      .tracking-tighter { letter-spacing: -0.05em; }
+      .tracking-widest { letter-spacing: 0.1em; }
+      .select-none { user-select: none; }
+      .pointer-events-none { pointer-events: none; }
+      .cursor-pointer { cursor: pointer; }
+      .cursor-move { cursor: move; }
+      .cursor-grab { cursor: grab; }
+      .cursor-grabbing { cursor: grabbing; }
+      .touch-none { touch-action: none; }
+      .flex { display: flex; }
+      .items-center { align-items: center; }
+      .justify-center { justify-content: center; }
+      .gap-2 { gap: 0.5rem; }
+      .border { border: 1px solid; }
+      .border-cyan-500\/30 { border-color: rgba(6, 182, 212, 0.3); }
+      .bg-black\/80 { background-color: rgba(0, 0, 0, 0.8); }
+
+      /* Loading state */
+      #loading {
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        height: 100%; color: #06b6d4;
+      }
+      #loading.hidden { display: none; }
+      #loading .spinner {
+        width: 40px; height: 40px;
+        border: 2px solid #1e293b;
+        border-top-color: #06b6d4;
+        border-radius: 50%;
+        animation: spin-slow 1s linear infinite;
+        margin-bottom: 1rem;
+      }
+
+      /* Fallback message */
+      #fallback {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #64748b;
+        text-align: center;
+        padding: 2rem;
+      }
+      #fallback h2 { color: #06b6d4; margin-bottom: 1rem; }
+      #fallback p { margin-bottom: 0.5rem; font-size: 0.875rem; }
+    </style>
+  </head>
+  <body class="bg-black text-slate-200">
+    <div id="loading">
+      <div class="spinner"></div>
+      <span class="text-xs">Loading NetworkCanvas...</span>
+    </div>
+    <div id="root"></div>
+    <div id="fallback">
+      <h2>Network Canvas</h2>
+      <p>The React widget bundle was not loaded.</p>
+      <p>Run <code>npm run build:widget</code> in the frontend directory.</p>
+    </div>
+
+    <script>
+      // Global state update function (called from Rust via evaluate_script)
+      window.updateNetworkState = function(state) {
+        console.log('[Webview] Received state update:', state.nodes?.length, 'nodes');
+        // Will be overridden by React component when mounted
+      };
+
+      // Timeout to show fallback if React doesn't load
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        var loading = document.getElementById('loading');
+        var fallback = document.getElementById('fallback');
+
+        if (!root.hasChildNodes()) {
+          loading.style.display = 'none';
+          fallback.style.display = 'flex';
+        }
+      }, 5000);
+
+      // Hide loading when React mounts
+      var checkInterval = setInterval(function() {
+        var root = document.getElementById('root');
+        if (root && root.hasChildNodes()) {
+          document.getElementById('loading').style.display = 'none';
+          clearInterval(checkInterval);
+        }
+      }, 100);
+    </script>
+
+    <!-- The widget bundle -->
+    <script src="./widget.js" onerror="console.warn('Widget bundle not found')"></script>
+  </body>
+</html>

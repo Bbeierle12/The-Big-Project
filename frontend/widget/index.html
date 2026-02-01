@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Network Canvas Widget</title>
+    <style>
+      /* Critical styles inlined for immediate rendering */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body, #root {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #000;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      /* Tailwind-like utilities for canvas */
+      .bg-black { background-color: #000; }
+      .text-cyan-400 { color: #22d3ee; }
+      .text-cyan-500 { color: #06b6d4; }
+      .text-slate-200 { color: #e2e8f0; }
+      .text-slate-500 { color: #64748b; }
+
+      /* Animation keyframes */
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes pulse-ring {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      @keyframes ping {
+        75%, 100% {
+          transform: scale(2);
+          opacity: 0;
+        }
+      }
+
+      @keyframes dash {
+        to {
+          stroke-dashoffset: -16;
+        }
+      }
+
+      .animate-spin-slow {
+        animation: spin-slow 20s linear infinite;
+      }
+
+      .animate-pulse-ring {
+        animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      .animate-ping {
+        animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+      }
+
+      .animate-spin {
+        animation: spin-slow 3s linear infinite;
+      }
+
+      .animate-pulse {
+        animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      .animate-dash {
+        animation: dash 0.5s linear infinite;
+      }
+
+      /* Utility classes */
+      .relative { position: relative; }
+      .absolute { position: absolute; }
+      .h-full { height: 100%; }
+      .w-full { width: 100%; }
+      .overflow-hidden { overflow: hidden; }
+      .z-10 { z-index: 10; }
+      .top-2 { top: 0.5rem; }
+      .right-2 { right: 0.5rem; }
+      .rounded { border-radius: 0.25rem; }
+      .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+      .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+      .text-xs { font-size: 0.75rem; line-height: 1rem; }
+      .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .font-bold { font-weight: 700; }
+      .font-black { font-weight: 900; }
+      .uppercase { text-transform: uppercase; }
+      .tracking-tighter { letter-spacing: -0.05em; }
+      .tracking-widest { letter-spacing: 0.1em; }
+      .select-none { user-select: none; }
+      .pointer-events-none { pointer-events: none; }
+      .cursor-pointer { cursor: pointer; }
+      .cursor-move { cursor: move; }
+      .cursor-grab { cursor: grab; }
+      .cursor-grabbing { cursor: grabbing; }
+      .touch-none { touch-action: none; }
+      .flex { display: flex; }
+      .items-center { align-items: center; }
+      .justify-center { justify-content: center; }
+      .gap-2 { gap: 0.5rem; }
+
+      .border { border-width: 1px; border-style: solid; }
+      .border-cyan-500\/30 { border-color: rgba(6, 182, 212, 0.3); }
+
+      .bg-black\/80 { background-color: rgba(0, 0, 0, 0.8); }
+
+      /* Loading state */
+      #loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #06b6d4;
+      }
+
+      #loading.hidden { display: none; }
+
+      #loading .spinner {
+        width: 40px;
+        height: 40px;
+        border: 2px solid #1e293b;
+        border-top: 2px solid #06b6d4;
+        border-radius: 50%;
+        animation: spin-slow 1s linear infinite;
+        margin-bottom: 1rem;
+      }
+    </style>
+  </head>
+  <body class="bg-black text-slate-200">
+    <div id="loading">
+      <div class="spinner"></div>
+      <span class="text-xs text-slate-500">Loading NetworkCanvas...</span>
+    </div>
+    <div id="root"></div>
+
+    <!-- The bundled widget script will be injected here during build -->
+    <script type="module" src="./index.tsx"></script>
+
+    <script>
+      // Hide loading spinner when React mounts
+      document.addEventListener('DOMContentLoaded', () => {
+        const loading = document.getElementById('loading');
+        const checkReady = setInterval(() => {
+          if (document.getElementById('root')?.hasChildNodes()) {
+            loading?.classList.add('hidden');
+            clearInterval(checkReady);
+          }
+        }, 50);
+      });
+    </script>
+  </body>
+</html>

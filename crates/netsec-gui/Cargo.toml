@@ -48,5 +48,12 @@ notify-rust = "4"
 directories = "5"
 toml = "0.8"
 
+# Webview for embedded React canvas
+wry = "0.46"
+raw-window-handle = "0.6"
+
 # Global hotkeys
 global-hotkey = "0.6"
+
+# Random number generation for layout
+rand = "0.8"

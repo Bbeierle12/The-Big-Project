@@ -3,6 +3,16 @@
 use crate::message::{
     ConnectionId, ConnectionType, NodeId, NodeStatus, NodeType, Severity,
 };
+use rand::Rng;
+
+/// Layout configuration for radial positioning
+pub mod layout {
+    pub const CENTER_X: f32 = 400.0;
+    pub const CENTER_Y: f32 = 200.0;
+    pub const SPOKE_Y_OFFSET: f32 = 150.0;
+    pub const BASE_RADIUS: f32 = 180.0;
+    pub const RADIUS_VARIATION: f32 = 60.0;
+}
 
 /// A vulnerability detected on a node.
 #[derive(Debug, Clone)]
@@ -267,6 +277,96 @@ impl NetworkState {
     /// Set zoom level.
     pub fn set_zoom(&mut self, zoom: f32) {
         self.zoom = zoom.clamp(0.25, 4.0);
+    }
+
+    /// Find the hub node (Router > Firewall > first node).
+    pub fn find_hub_node(&self) -> Option<NodeId> {
+        // Priority 1: Router
+        if let Some(node) = self.nodes.iter().find(|n| matches!(n.node_type, NodeType::Router)) {
+            return Some(node.id);
+        }
+        // Priority 2: Firewall
+        if let Some(node) = self.nodes.iter().find(|n| matches!(n.node_type, NodeType::Firewall)) {
+            return Some(node.id);
+        }
+        // Fallback: first node
+        self.nodes.first().map(|n| n.id)
+    }
+
+    /// Apply radial hub-and-spoke layout to all nodes.
+    pub fn apply_radial_layout(&mut self) {
+        use std::f32::consts::PI;
+
+        if self.nodes.is_empty() {
+            return;
+        }
+
+        let hub_id = match self.find_hub_node() {
+            Some(id) => id,
+            None => return,
+        };
+
+        // Position hub at center
+        if let Some(hub) = self.get_node_mut(hub_id) {
+            hub.x = layout::CENTER_X;
+            hub.y = layout::CENTER_Y;
+        }
+
+        // Collect spoke node IDs (all nodes except hub)
+        let spoke_ids: Vec<NodeId> = self.nodes
+            .iter()
+            .filter(|n| n.id != hub_id)
+            .map(|n| n.id)
+            .collect();
+
+        let spoke_count = spoke_ids.len();
+        if spoke_count == 0 {
+            return;
+        }
+
+        // Position spokes in a circle around hub
+        let mut rng = rand::thread_rng();
+        for (index, node_id) in spoke_ids.iter().enumerate() {
+            let angle = (2.0 * PI * index as f32) / spoke_count as f32;
+            let radius = layout::BASE_RADIUS + rng.gen_range(0.0..layout::RADIUS_VARIATION);
+            let x = layout::CENTER_X + angle.cos() * radius;
+            let y = layout::CENTER_Y + layout::SPOKE_Y_OFFSET + angle.sin() * radius;
+
+            if let Some(node) = self.get_node_mut(*node_id) {
+                node.x = x;
+                node.y = y;
+            }
+        }
+    }
+
+    /// Create connections from hub to all spoke nodes.
+    pub fn create_hub_connections(&mut self) {
+        let hub_id = match self.find_hub_node() {
+            Some(id) => id,
+            None => return,
+        };
+
+        // Collect spoke IDs and their types
+        let spokes: Vec<(NodeId, NodeType)> = self.nodes
+            .iter()
+            .filter(|n| n.id != hub_id)
+            .map(|n| (n.id, n.node_type.clone()))
+            .collect();
+
+        for (spoke_id, node_type) in spokes {
+            // Determine connection type based on device type
+            let conn_type = match node_type {
+                NodeType::Server | NodeType::Database | NodeType::Firewall | NodeType::Workstation => {
+                    ConnectionType::Wired
+                }
+                NodeType::Mobile | NodeType::IoT | NodeType::Extender => {
+                    ConnectionType::Wireless
+                }
+                _ => ConnectionType::Wired,
+            };
+
+            self.add_connection(hub_id, spoke_id, conn_type);
+        }
     }
 
     /// Create a sample network for testing.

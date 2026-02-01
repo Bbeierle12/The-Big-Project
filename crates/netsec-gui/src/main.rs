@@ -9,6 +9,7 @@ mod message;
 mod state;
 mod theme;
 mod views;
+mod webview;
 
 use iced::Size;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};

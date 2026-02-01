@@ -507,4 +507,31 @@ pub enum Message {
     WsEventReceived(WsEvent),
     /// WebSocket parse error
     WsParseError(String),
+
+    // =========================================================================
+    // Webview Messages (React NetworkCanvas)
+    // =========================================================================
+
+    /// Webview has finished loading and is ready
+    WebviewReady,
+    /// User selected a node in the webview
+    WebviewNodeSelected(String, bool),
+    /// User deselected all nodes in the webview
+    WebviewNodeDeselected,
+    /// User moved a node in the webview
+    WebviewNodeMoved(String, f32, f32),
+    /// User panned the canvas in the webview
+    WebviewCanvasPan(f32, f32),
+    /// User zoomed the canvas in the webview
+    WebviewCanvasZoom(f32),
+    /// User started a connection in the webview
+    WebviewStartConnection(String),
+    /// User completed a connection in the webview
+    WebviewCompleteConnection(String),
+    /// User cancelled a connection in the webview
+    WebviewCancelConnection,
+    /// User hovered over a connection in the webview
+    WebviewConnectionHovered(Option<String>),
+    /// Periodic tick for processing webview events
+    WebviewTick,
 }

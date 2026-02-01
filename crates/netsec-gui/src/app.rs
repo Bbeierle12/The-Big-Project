@@ -8,7 +8,8 @@ use crate::api::{
     websocket::{self, WsMessage2},
 };
 use crate::desktop::{notifications, persistence};
-use crate::message::{InspectorTab, Message, NodeType, Severity, ToastLevel, ToolMode};
+use crate::message::{InspectorTab, Message, Severity, ToastLevel, ToolMode};
+use crate::webview::{NetworkStateJson, parse_node_id, parse_connection_id};
 use crate::views::settings::Settings;
 use crate::views::ui_components::{ConfirmDialog, Toast};
 use crate::state::network::NetworkState;
@@ -1389,7 +1390,87 @@ impl NetWatch {
                 tracing::warn!("WebSocket parse error: {}", error);
                 Task::none()
             }
+
+            // =================================================================
+            // Webview Messages (React NetworkCanvas)
+            // =================================================================
+
+            Message::WebviewReady => {
+                tracing::info!("React NetworkCanvas webview is ready");
+                // Sync current state to webview
+                self.sync_state_to_webview();
+                Task::none()
+            }
+            Message::WebviewNodeSelected(id_str, add_to_selection) => {
+                if let Some(node_id) = parse_node_id(&id_str) {
+                    if add_to_selection {
+                        self.network.add_to_selection(&[node_id]);
+                    } else {
+                        self.network.select_node(node_id);
+                    }
+                    self.sync_state_to_webview();
+                }
+                Task::none()
+            }
+            Message::WebviewNodeDeselected => {
+                self.network.clear_selection();
+                self.sync_state_to_webview();
+                Task::none()
+            }
+            Message::WebviewNodeMoved(id_str, x, y) => {
+                if let Some(node_id) = parse_node_id(&id_str) {
+                    self.network.move_node(node_id, x, y);
+                    // Don't sync back to webview for moves - the webview is the source of truth here
+                }
+                Task::none()
+            }
+            Message::WebviewCanvasPan(dx, dy) => {
+                self.network.pan(dx, dy);
+                // Don't sync back to webview - it's handling the pan locally
+                Task::none()
+            }
+            Message::WebviewCanvasZoom(zoom) => {
+                self.network.set_zoom(zoom);
+                // Don't sync back to webview - it's handling the zoom locally
+                Task::none()
+            }
+            Message::WebviewStartConnection(from_id_str) => {
+                if let Some(node_id) = parse_node_id(&from_id_str) {
+                    self.network.connecting_from = Some(node_id);
+                }
+                Task::none()
+            }
+            Message::WebviewCompleteConnection(to_id_str) => {
+                if let Some(to_id) = parse_node_id(&to_id_str) {
+                    if let Some(from_id) = self.network.connecting_from.take() {
+                        use crate::message::ConnectionType;
+                        self.network.add_connection(from_id, to_id, ConnectionType::Wired);
+                        self.sync_state_to_webview();
+                    }
+                }
+                Task::none()
+            }
+            Message::WebviewCancelConnection => {
+                self.network.connecting_from = None;
+                Task::none()
+            }
+            Message::WebviewConnectionHovered(id_opt) => {
+                self.network.hovered_connection = id_opt.and_then(|s| parse_connection_id(&s));
+                Task::none()
+            }
+            Message::WebviewTick => {
+                // Process any pending webview events (handled via IPC channel)
+                Task::none()
+            }
         }
+    }
+
+    /// Sync the current network state to the webview.
+    fn sync_state_to_webview(&self) {
+        // For now, this is a placeholder - actual webview sync will be added
+        // when we integrate the CanvasWebview into the application
+        let json = NetworkStateJson::from(&self.network);
+        tracing::debug!("Would sync {} nodes to webview", json.nodes.len());
     }
 
     /// Handle a WebSocket event from the backend.
@@ -1569,13 +1650,9 @@ impl NetWatch {
                     _ => NodeType::Workstation, // Default
                 };
 
-                // Calculate position (grid layout for new devices)
-                let count = self.network.nodes.len();
-                let cols = 5;
-                let row = count / cols;
-                let col = count % cols;
-                let x = 150.0 + (col as f32 * 150.0);
-                let y = 150.0 + (row as f32 * 120.0);
+                // Temporary position - radial layout applied after all nodes added
+                let x = 0.0;
+                let y = 0.0;
 
                 let label = api_device.hostname.clone()
                     .unwrap_or_else(|| api_device.ip_address.clone());
@@ -1602,6 +1679,12 @@ impl NetWatch {
                 self.network.add_node(node);
             }
         }
+
+        // Apply radial layout to position all nodes
+        self.network.apply_radial_layout();
+
+        // Create hub-to-spoke connections
+        self.network.create_hub_connections();
 
         // Sync vulnerabilities to nodes
         self.sync_vulnerabilities_to_canvas();
