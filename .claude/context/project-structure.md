@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-02-01T02:21:43Z
-version: 1.1
+last_updated: 2026-02-02T17:49:58Z
+version: 1.2
 author: Claude Code PM System
 ---
 
@@ -104,6 +104,10 @@ crates/
 
 ```
 netsec-gui/
+├── assets/
+│   └── webview/          # Prebuilt webview assets
+│       ├── index.html    # Widget HTML container
+│       └── widget.js     # Bundled React widget
 ├── src/
 │   ├── main.rs           # Application entry point
 │   ├── app.rs            # Main application state and logic (1850+ lines)
@@ -123,6 +127,10 @@ netsec-gui/
 │   │   ├── mod.rs
 │   │   ├── network.rs    # Network canvas state
 │   │   └── terminal.rs   # Terminal emulation state
+│   ├── webview/          # Wry webview integration (NEW)
+│   │   ├── mod.rs
+│   │   ├── canvas_webview.rs # WebView for React NetworkCanvas
+│   │   └── ipc.rs        # IPC messaging between Iced and WebView
 │   └── views/            # UI views (Iced widgets)
 │       ├── mod.rs
 │       ├── alerts.rs     # Alerts dashboard
@@ -161,19 +169,28 @@ frontend/
 │   ├── NetworkCanvas.tsx # Main canvas for network visualization
 │   ├── NetworkNode.tsx   # Individual node rendering
 │   ├── Terminal.tsx      # Command terminal UI
+│   ├── ConsolePanel.tsx  # Console panel with logs/terminal tabs (NEW)
+│   ├── TerminalTabs.tsx  # Multi-tab terminal interface (NEW)
+│   ├── XTerminal.tsx     # Xterm.js terminal component (NEW)
 │   ├── Toolbar.tsx       # Tool buttons
 │   └── VulnerabilityDashboard.tsx
 ├── hooks/                # React hooks
 │   ├── useNetwork.ts     # Network state and WS handling
 │   ├── useScanner.ts     # Scan operations
 │   ├── usePentest.ts     # Tool execution
-│   └── useInteraction.ts # Canvas interactions
+│   ├── useInteraction.ts # Canvas interactions
+│   ├── useSystemLogs.ts  # System log streaming (NEW)
+│   └── useTerminalSession.ts # Terminal session management (NEW)
 ├── services/             # API client
 │   └── api.ts            # NetWatchApi class
 ├── utils/                # Utilities
 │   └── networkUtils.ts   # OUI lookup, IP generation
+├── widget/               # Standalone React widget for webview (NEW)
+│   ├── index.html        # Widget HTML container
+│   └── index.tsx         # Widget entry point (NetworkCanvas only)
 ├── types.ts              # TypeScript type definitions
 ├── App.tsx               # Main application component
+├── vite.config.widget.ts # Vite config for widget build (NEW)
 └── index.tsx             # Entry point
 ```
 

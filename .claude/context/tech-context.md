@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-02-02T02:50:55Z
-version: 1.2
+last_updated: 2026-02-02T17:49:58Z
+version: 1.3
 author: Claude Code PM System
 ---
 
@@ -76,6 +76,9 @@ author: Claude Code PM System
 | toml | 0.8 | Settings file format |
 | global-hotkey | 0.6 | System-wide keyboard shortcuts |
 | vt100 | 0.15 | Terminal emulation |
+| wry | 0.46 | Cross-platform webview for React widgets |
+| raw-window-handle | 0.6 | Window handle abstraction for wry |
+| rand | 0.8 | Random number generation (layout) |
 
 ## Frontend Dependencies
 
