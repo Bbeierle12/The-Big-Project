@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-02-01T02:21:43Z
-version: 1.1
+last_updated: 2026-02-02T02:50:55Z
+version: 1.2
 author: Claude Code PM System
 ---
 
@@ -86,6 +86,9 @@ author: Claude Code PM System
 | react-dom | ^19.2 | DOM rendering |
 | lucide-react | ^0.563 | Icon library |
 | recharts | 2.12 | Charting library |
+| @xterm/xterm | ^6.0.0 | Terminal emulator |
+| @xterm/addon-fit | ^0.11.0 | Terminal resize support |
+| @xterm/addon-web-links | ^0.12.0 | Clickable links in terminal |
 
 ### Development
 | Package | Version | Purpose |

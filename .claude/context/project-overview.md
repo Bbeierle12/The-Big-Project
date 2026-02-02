@@ -1,7 +1,7 @@
 ---
 created: 2026-01-31T07:05:47Z
-last_updated: 2026-02-01T02:21:43Z
-version: 1.1
+last_updated: 2026-02-02T02:50:55Z
+version: 1.2
 author: Claude Code PM System
 ---
 
@@ -108,6 +108,7 @@ NetSec Orchestrator is a unified network security platform that integrates multi
 - **Settings persistence** - TOML config in user directory
 - **Auto-refresh** - Configurable data refresh interval
 - **Toast notifications** - In-app notifications with auto-dismiss
+- **Wry webview** - Embeds React NetworkCanvas widget for rich visualization
 
 ## Integration Points
 
@@ -162,4 +163,5 @@ NetSec Orchestrator is a unified network security platform that integrates multi
 - Desktop app installers/packaging
 
 ## Update History
+- 2026-02-02: Added Wry webview integration, xterm terminal dependencies
 - 2026-02-01: Added native desktop application (netsec-gui)
