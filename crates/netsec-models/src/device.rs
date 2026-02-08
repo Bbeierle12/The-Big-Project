@@ -10,6 +10,8 @@ use uuid::Uuid;
 pub enum DeviceStatus {
     Online,
     Offline,
+    Warning,
+    Compromised,
     Unknown,
 }
 
@@ -18,6 +20,8 @@ impl DeviceStatus {
         match self {
             Self::Online => "online",
             Self::Offline => "offline",
+            Self::Warning => "warning",
+            Self::Compromised => "compromised",
             Self::Unknown => "unknown",
         }
     }
@@ -26,6 +30,8 @@ impl DeviceStatus {
         match s {
             "online" => Self::Online,
             "offline" => Self::Offline,
+            "warning" => Self::Warning,
+            "compromised" => Self::Compromised,
             _ => Self::Unknown,
         }
     }
@@ -91,6 +97,9 @@ pub struct Device {
     pub status: String,
     pub first_seen: String,
     pub last_seen: String,
+    // Added in migration 011
+    pub os_version: Option<String>,
+    pub notes: Option<String>,
 }
 
 impl Device {
@@ -109,6 +118,8 @@ impl Device {
             status: DeviceStatus::Unknown.as_str().to_string(),
             first_seen: now.clone(),
             last_seen: now,
+            os_version: None,
+            notes: None,
         }
     }
 
@@ -150,7 +161,13 @@ mod tests {
 
     #[test]
     fn test_device_status_roundtrip() {
-        for s in [DeviceStatus::Online, DeviceStatus::Offline, DeviceStatus::Unknown] {
+        for s in [
+            DeviceStatus::Online,
+            DeviceStatus::Offline,
+            DeviceStatus::Warning,
+            DeviceStatus::Compromised,
+            DeviceStatus::Unknown,
+        ] {
             assert_eq!(DeviceStatus::from_str_lossy(s.as_str()), s);
         }
     }
@@ -215,6 +232,8 @@ mod tests {
         assert!(device.hostname.is_none());
         assert!(device.vendor.is_none());
         assert!(device.os_family.is_none());
+        assert!(device.os_version.is_none());
+        assert!(device.notes.is_none());
         // ID is a valid UUID
         uuid::Uuid::parse_str(&device.id).expect("id should be valid UUID");
         // Timestamps present

@@ -512,6 +512,8 @@ pub enum Message {
     // Webview Messages (React NetworkCanvas)
     // =========================================================================
 
+    /// Window handle obtained for webview creation
+    WebviewHandleReady(isize),
     /// Webview has finished loading and is ready
     WebviewReady,
     /// User selected a node in the webview

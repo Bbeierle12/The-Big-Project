@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 /// Static OUI table mapping normalized MAC prefixes (first 8 chars, "XX:XX:XX")
-/// to vendor names. Common entries covering major device manufacturers.
+/// to vendor names. This is a curated subset for demo/testing purposes, not a
+/// full IEEE OUI database. See `data/oui_reference.json` for the canonical list.
 static OUI_TABLE: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     let mut m = HashMap::new();
     m.insert("00:00:0C", "Cisco");
@@ -29,7 +30,7 @@ static OUI_TABLE: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
     m.insert("F8:1A:67", "TP-Link");
     m.insert("00:1D:7E", "Cisco");
     m.insert("00:26:CB", "Cisco");
-    m.insert("00:17:88", "Philips Lighting");
+    m.insert("00:17:88", "Signify N.V.");
     m.insert("44:D9:E7", "Ubiquiti");
     m.insert("80:2A:A8", "Ubiquiti");
     m.insert("00:1B:44", "SanDisk");

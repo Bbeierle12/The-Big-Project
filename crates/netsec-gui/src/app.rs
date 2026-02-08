@@ -9,7 +9,7 @@ use crate::api::{
 };
 use crate::desktop::{notifications, persistence};
 use crate::message::{InspectorTab, Message, Severity, ToastLevel, ToolMode};
-use crate::webview::{NetworkStateJson, parse_node_id, parse_connection_id};
+use crate::webview::{CanvasWebview, NetworkStateJson, WebviewEvent, parse_node_id, parse_connection_id};
 use crate::views::settings::Settings;
 use crate::views::ui_components::{ConfirmDialog, Toast};
 use crate::state::network::NetworkState;
@@ -126,6 +126,16 @@ pub struct NetWatch {
     ws_enabled: bool,
     /// Last auto-refresh time
     last_refresh: Instant,
+    /// Wry webview for React NetworkCanvas
+    webview: Option<CanvasWebview>,
+    /// Receiver for webview IPC events
+    webview_event_rx: Option<std::sync::mpsc::Receiver<WebviewEvent>>,
+    /// Whether webview has been successfully created
+    webview_initialized: bool,
+    /// Current window width in logical pixels
+    window_width: f64,
+    /// Current window height in logical pixels
+    window_height: f64,
 }
 
 impl NetWatch {
@@ -165,13 +175,17 @@ impl NetWatch {
             max_reconnect_attempts: 10,
         };
 
-        // Initial commands: terminal + fetch initial data
+        // Task to obtain the window handle for webview creation
+        let webview_task = Self::create_webview_init_task();
+
+        // Initial commands: terminal + fetch initial data + webview init
         let init_cmd = Task::batch([
             terminal_cmd,
             Task::done(Message::FetchDevices),
             Task::done(Message::FetchScans),
             Task::done(Message::FetchAlerts),
             Task::done(Message::FetchAlertStats),
+            webview_task,
         ]);
 
         (
@@ -211,9 +225,48 @@ impl NetWatch {
                 ws_config,
                 ws_enabled: true,
                 last_refresh: Instant::now(),
+                webview: None,
+                webview_event_rx: None,
+                webview_initialized: false,
+                window_width: 1400.0,
+                window_height: 900.0,
             },
             init_cmd,
         )
+    }
+
+    /// Create a Task that obtains the window handle for webview creation.
+    #[cfg(target_os = "windows")]
+    fn create_webview_init_task() -> Task<Message> {
+        iced::window::get_oldest().then(|opt_id| {
+            match opt_id {
+                Some(id) => iced::window::run_with_handle(id, |handle| {
+                    use raw_window_handle::HasWindowHandle;
+                    handle.window_handle().ok().and_then(|wh| {
+                        match wh.as_raw() {
+                            raw_window_handle::RawWindowHandle::Win32(h) => {
+                                Some(h.hwnd.get() as isize)
+                            }
+                            _ => None,
+                        }
+                    })
+                }).map(|opt_hwnd| {
+                    match opt_hwnd {
+                        Some(hwnd) => Message::WebviewHandleReady(hwnd),
+                        None => Message::Tick,
+                    }
+                }),
+                None => {
+                    tracing::debug!("Window not ready yet, will retry webview init");
+                    Task::done(Message::Tick)
+                }
+            }
+        })
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn create_webview_init_task() -> Task<Message> {
+        Task::none()
     }
 
     /// Get the window title.
@@ -452,14 +505,17 @@ impl NetWatch {
             // === UI Panels ===
             Message::ToggleTerminalPanel => {
                 self.terminal_visible = !self.terminal_visible;
+                self.update_webview_bounds();
                 Task::none()
             }
             Message::ToggleInspectorPanel => {
                 self.inspector_visible = !self.inspector_visible;
+                self.update_webview_bounds();
                 Task::none()
             }
             Message::ToggleToolbar => {
                 self.toolbar_visible = !self.toolbar_visible;
+                self.update_webview_bounds();
                 Task::none()
             }
             Message::ShowVulnDashboard => {
@@ -761,13 +817,22 @@ impl NetWatch {
                     }
                 }
 
+                // Retry webview creation if not yet initialized
+                if !self.webview_initialized {
+                    tasks.push(Self::create_webview_init_task());
+                }
+
                 if tasks.is_empty() {
                     Task::none()
                 } else {
                     Task::batch(tasks)
                 }
             }
-            Message::WindowResized(_, _) => {
+            Message::WindowResized(w, h) => {
+                tracing::debug!("WindowResized: {}x{}", w, h);
+                self.window_width = w as f64;
+                self.window_height = h as f64;
+                self.update_webview_bounds();
                 Task::none()
             }
 
@@ -1395,8 +1460,38 @@ impl NetWatch {
             // Webview Messages (React NetworkCanvas)
             // =================================================================
 
+            Message::WebviewHandleReady(hwnd) => {
+                if self.webview.is_none() {
+                    tracing::info!("Got window handle (HWND={}), creating webview", hwnd);
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    match CanvasWebview::new(hwnd, tx) {
+                        Ok(wv) => {
+                            self.webview = Some(wv);
+                            self.webview_event_rx = Some(rx);
+                            self.webview_initialized = true;
+                            tracing::info!("Webview created successfully");
+                            self.update_webview_bounds();
+                            self.sync_state_to_webview();
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to create webview: {}", e);
+                        }
+                    }
+                }
+                // Query the actual window size to correct initial bounds
+                iced::window::get_oldest().then(|opt_id| {
+                    match opt_id {
+                        Some(id) => iced::window::get_size(id)
+                            .map(|size| Message::WindowResized(size.width as u32, size.height as u32)),
+                        None => Task::none(),
+                    }
+                })
+            }
             Message::WebviewReady => {
                 tracing::info!("React NetworkCanvas webview is ready");
+                if let Some(ref mut wv) = self.webview {
+                    wv.set_ready();
+                }
                 // Sync current state to webview
                 self.sync_state_to_webview();
                 Task::none()
@@ -1459,18 +1554,106 @@ impl NetWatch {
                 Task::none()
             }
             Message::WebviewTick => {
-                // Process any pending webview events (handled via IPC channel)
-                Task::none()
+                // Drain pending webview IPC events
+                let mut tasks = Vec::new();
+                if let Some(ref rx) = self.webview_event_rx {
+                    while let Ok(event) = rx.try_recv() {
+                        match event {
+                            WebviewEvent::Ready => {
+                                tasks.push(Task::done(Message::WebviewReady));
+                            }
+                            WebviewEvent::NodeSelected { id, add_to_selection } => {
+                                tasks.push(Task::done(Message::WebviewNodeSelected(id, add_to_selection)));
+                            }
+                            WebviewEvent::NodeDeselected => {
+                                tasks.push(Task::done(Message::WebviewNodeDeselected));
+                            }
+                            WebviewEvent::NodeMoved { id, x, y } => {
+                                tasks.push(Task::done(Message::WebviewNodeMoved(id, x, y)));
+                            }
+                            WebviewEvent::CanvasPan { dx, dy } => {
+                                tasks.push(Task::done(Message::WebviewCanvasPan(dx, dy)));
+                            }
+                            WebviewEvent::CanvasZoom { zoom } => {
+                                tasks.push(Task::done(Message::WebviewCanvasZoom(zoom)));
+                            }
+                            WebviewEvent::StartConnection { from_id } => {
+                                tasks.push(Task::done(Message::WebviewStartConnection(from_id)));
+                            }
+                            WebviewEvent::CompleteConnection { to_id } => {
+                                tasks.push(Task::done(Message::WebviewCompleteConnection(to_id)));
+                            }
+                            WebviewEvent::CancelConnection => {
+                                tasks.push(Task::done(Message::WebviewCancelConnection));
+                            }
+                            WebviewEvent::ConnectionHovered { id } => {
+                                tasks.push(Task::done(Message::WebviewConnectionHovered(id)));
+                            }
+                        }
+                    }
+                }
+                if tasks.is_empty() {
+                    Task::none()
+                } else {
+                    Task::batch(tasks)
+                }
             }
         }
     }
 
     /// Sync the current network state to the webview.
     fn sync_state_to_webview(&self) {
-        // For now, this is a placeholder - actual webview sync will be added
-        // when we integrate the CanvasWebview into the application
-        let json = NetworkStateJson::from(&self.network);
-        tracing::debug!("Would sync {} nodes to webview", json.nodes.len());
+        if let Some(ref wv) = self.webview {
+            let json = NetworkStateJson::from(&self.network);
+            if let Err(e) = wv.update_state(&json) {
+                tracing::warn!("Failed to sync state to webview: {}", e);
+            }
+        }
+    }
+
+    /// Recompute and apply webview bounds based on current layout state.
+    fn update_webview_bounds(&mut self) {
+        // Layout constants (must match the view code)
+        const HEADER_HEIGHT: f64 = 56.0; // header container height
+        const RULE_HEIGHT: f64 = 1.0;    // horizontal_rule(1)
+        const TOOLBAR_WIDTH: f64 = 72.0; // toolbar container width
+        const INSPECTOR_WIDTH: f64 = 280.0; // inspector panel width
+        const ROW_SPACING: f64 = 1.0;    // main_content row spacing
+
+        let top = HEADER_HEIGHT + RULE_HEIGHT;
+        let left = if self.toolbar_visible {
+            TOOLBAR_WIDTH + ROW_SPACING
+        } else {
+            0.0
+        };
+        let right_inset = if self.inspector_visible {
+            INSPECTOR_WIDTH + ROW_SPACING
+        } else {
+            0.0
+        };
+
+        // Main content area height depends on terminal visibility.
+        // column uses FillPortion(7) for main, FillPortion(3) for terminal.
+        let available_height = self.window_height - top;
+        let main_height = if self.terminal_visible {
+            available_height * 7.0 / 10.0
+        } else {
+            available_height
+        };
+
+        let width = (self.window_width - left - right_inset).max(0.0);
+        let height = main_height.max(0.0);
+
+        tracing::debug!(
+            "Webview bounds: x={:.0}, y={:.0}, w={:.0}, h={:.0} (window={:.0}x{:.0})",
+            left, top, width, height, self.window_width, self.window_height
+        );
+
+        if let Some(ref mut wv) = self.webview {
+            if let Err(e) = wv.set_bounds(left, top, width, height) {
+                tracing::warn!("Failed to update webview bounds: {}", e);
+            }
+        }
     }
 
     /// Handle a WebSocket event from the backend.
@@ -1899,7 +2082,24 @@ impl NetWatch {
             self.terminal.subscription(),
             // Tick every second for toasts and auto-refresh
             time::every(Duration::from_secs(1)).map(|_| Message::Tick),
+            // Window size events for webview bounds (Opened + Resized)
+            iced::event::listen_with(|event, _status, _id| {
+                match event {
+                    iced::Event::Window(iced::window::Event::Opened { size, .. }) => {
+                        Some(Message::WindowResized(size.width as u32, size.height as u32))
+                    }
+                    iced::Event::Window(iced::window::Event::Resized(size)) => {
+                        Some(Message::WindowResized(size.width as u32, size.height as u32))
+                    }
+                    _ => None,
+                }
+            }),
         ];
+
+        // Webview event polling (fast tick for responsive IPC)
+        if self.webview_initialized {
+            subs.push(time::every(Duration::from_millis(50)).map(|_| Message::WebviewTick));
+        }
 
         // WebSocket subscription (if enabled)
         if self.ws_enabled {

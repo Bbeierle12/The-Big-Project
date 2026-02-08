@@ -1,5 +1,10 @@
 import { NodeType } from '../types';
 
+/**
+ * Look up a MAC OUI prefix by vendor name.
+ * This is a curated demo subset, not a full IEEE OUI database.
+ * See `data/oui_reference.json` for the canonical reference.
+ */
 export const lookupOUI = (vendorString: string): string => {
   const ouiDatabase: Record<string, string> = {
     'Juniper Networks': '00:10:DB',
@@ -37,6 +42,11 @@ export const isValidCIDR = (cidr: string): boolean => {
 
 export const randomIP = () => `192.168.1.${Math.floor(Math.random() * 254) + 10}`;
 
+/**
+ * Pool of realistic hardware devices used for demo topology generation.
+ * Each entry pairs a device label with its vendor for OUI lookup.
+ * Vendors must match keys in the `lookupOUI` database above.
+ */
 export const HARDWARE_POOL: {type: NodeType, label: string, vendor: string}[] = [
   { type: 'iot', label: 'Philips Hue Hub', vendor: 'Signify N.V.' },
   { type: 'mobile', label: 'iPad Air', vendor: 'Apple Inc.' },

@@ -36,12 +36,19 @@ impl CanvasWebview {
         event_tx: mpsc::Sender<WebviewEvent>,
     ) -> Result<Self, WebviewError> {
 
-        // Build the webview with the embedded HTML
-        let html_content = include_str!("../../assets/webview/index.html");
+        // Build the webview with the embedded HTML + inlined widget JS.
+        // We must inline widget.js because with_html() has no base URL,
+        // so relative <script src="./widget.js"> would never resolve.
+        let html_template = include_str!("../../assets/webview/index.html");
+        let widget_js = include_str!("../../assets/webview/widget.js");
+        let html_content = html_template.replace(
+            r#"<script src="./widget.js" onerror="console.warn('Widget bundle not found')"></script>"#,
+            &format!("<script>{}</script>", widget_js),
+        );
 
         // Create the IPC handler closure
         let webview = WebViewBuilder::new()
-            .with_html(html_content)
+            .with_html(&html_content)
             .with_transparent(true)
             .with_bounds(Rect {
                 position: LogicalPosition::new(0.0, 0.0).into(),

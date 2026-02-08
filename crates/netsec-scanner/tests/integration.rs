@@ -24,49 +24,35 @@ async fn test_full_scan_pipeline() {
     assert!(args.contains(&"-sV".to_string()));
     assert!(args.contains(&"-O".to_string()));
 
-    // Step 2: Parse XML fixture (simulating nmap output)
-    let xml = r#"<?xml version="1.0"?>
-<nmaprun scanner="nmap">
-  <host>
-    <status state="up"/>
-    <address addr="192.168.1.10" addrtype="ipv4"/>
-    <address addr="AA:BB:CC:DD:EE:FF" addrtype="mac" vendor="TestVendor"/>
-    <hostnames><hostname name="webserver.local" type="PTR"/></hostnames>
-    <ports>
-      <port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port>
-      <port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port>
-      <port protocol="tcp" portid="443"><state state="open"/><service name="https"/></port>
-    </ports>
-    <os><osmatch name="Linux 5.x" accuracy="95"/></os>
-  </host>
-</nmaprun>"#;
+    // Step 2: Parse XML fixture (shared canonical fixture)
+    let xml = include_str!("../../../tests/fixtures/nmap_single_host.xml");
 
     let scan_result = netsec_parsers::nmap::parse_nmap_xml(xml).unwrap();
 
-    // Step 3: Process results
+    // Step 3: Process results (fixture has 192.168.1.1 with ports 22 and 80)
     let hosts = process_nmap_results(&scan_result);
     assert_eq!(hosts.len(), 1);
-    assert_eq!(hosts[0].ip, "192.168.1.10");
-    assert_eq!(hosts[0].ports.len(), 3);
+    assert_eq!(hosts[0].ip, "192.168.1.1");
+    assert_eq!(hosts[0].ports.len(), 2);
 
     // Step 4: Persist
     let devices = scanner.persist_hosts(&hosts).await.unwrap();
     assert_eq!(devices.len(), 1);
-    assert_eq!(devices[0].ip, "192.168.1.10");
-    assert_eq!(devices[0].device_type, "server"); // 3 server ports
+    assert_eq!(devices[0].ip, "192.168.1.1");
+    assert_eq!(devices[0].device_type, "server"); // 2 server ports (22, 80)
 
     // Step 5: Verify DB
-    let from_db = netsec_db::repo::devices::get_by_ip(&pool, "192.168.1.10")
+    let from_db = netsec_db::repo::devices::get_by_ip(&pool, "192.168.1.1")
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(from_db.hostname.as_deref(), Some("webserver.local"));
+    assert_eq!(from_db.hostname.as_deref(), Some("router.local"));
     assert_eq!(from_db.device_type, "server");
 
     let ports = netsec_db::repo::ports::list_by_device(&pool, &from_db.id)
         .await
         .unwrap();
-    assert_eq!(ports.len(), 3);
+    assert_eq!(ports.len(), 2);
 }
 
 /// mDNS discovers device -> nmap scan enriches it -> single device in DB.

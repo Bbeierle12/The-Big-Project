@@ -125,6 +125,12 @@ pub struct Alert {
     pub count: i64,
     pub created_at: String,
     pub updated_at: String,
+    pub notes: Option<String>,
+    pub source_event_id: Option<String>,
+    pub device_id: Option<String>,
+    pub raw_data: Option<String>,
+    pub first_seen: String,
+    pub last_seen: String,
 }
 
 impl Alert {
@@ -143,7 +149,13 @@ impl Alert {
             correlation_id: None,
             count: 1,
             created_at: now.clone(),
-            updated_at: now,
+            updated_at: now.clone(),
+            notes: None,
+            source_event_id: None,
+            device_id: None,
+            raw_data: None,
+            first_seen: now.clone(),
+            last_seen: now,
         }
     }
 
@@ -308,6 +320,12 @@ mod tests {
         assert_eq!(alert.description, "");
         assert!(alert.device_ip.is_none());
         assert!(alert.correlation_id.is_none());
+        assert!(alert.notes.is_none());
+        assert!(alert.source_event_id.is_none());
+        assert!(alert.device_id.is_none());
+        assert!(alert.raw_data.is_none());
+        assert!(!alert.first_seen.is_empty());
+        assert!(!alert.last_seen.is_empty());
         // ID is a valid UUID
         uuid::Uuid::parse_str(&alert.id).expect("id should be valid UUID");
         // Timestamps are present

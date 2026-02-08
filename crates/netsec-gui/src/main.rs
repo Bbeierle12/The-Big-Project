@@ -18,7 +18,11 @@ fn main() -> iced::Result {
     // Initialize logging
     tracing_subscriber::registry()
         .with(fmt::layer())
-        .with(EnvFilter::from_default_env().add_directive("netsec_gui=debug".parse().unwrap()))
+        .with(
+            EnvFilter::from_default_env()
+                .add_directive("netsec_gui=debug".parse().unwrap())
+                .add_directive("netwatch=debug".parse().unwrap()),
+        )
         .init();
 
     tracing::info!("Starting NetWatch Desktop Application");

@@ -89,6 +89,7 @@ pub struct Scan {
     pub tool: String,
     pub target: String,
     pub status: String,
+    /// Scan progress as an integer percentage 0-100, mapped from the Python API.
     pub progress: u8,
     pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,

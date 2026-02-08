@@ -5,8 +5,8 @@ use sqlx::SqlitePool;
 
 pub async fn insert(pool: &SqlitePool, device: &Device) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO devices (id, ip, mac, hostname, vendor, os_family, device_type, classification_confidence, status, first_seen, last_seen)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO devices (id, ip, mac, hostname, vendor, os_family, os_version, device_type, classification_confidence, status, notes, first_seen, last_seen)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&device.id)
     .bind(&device.ip)
@@ -14,9 +14,11 @@ pub async fn insert(pool: &SqlitePool, device: &Device) -> Result<(), sqlx::Erro
     .bind(&device.hostname)
     .bind(&device.vendor)
     .bind(&device.os_family)
+    .bind(&device.os_version)
     .bind(&device.device_type)
     .bind(device.classification_confidence)
     .bind(&device.status)
+    .bind(&device.notes)
     .bind(&device.first_seen)
     .bind(&device.last_seen)
     .execute(pool)
@@ -48,7 +50,7 @@ pub async fn list(pool: &SqlitePool, limit: i64, offset: i64) -> Result<Vec<Devi
 
 pub async fn update(pool: &SqlitePool, device: &Device) -> Result<bool, sqlx::Error> {
     let result = sqlx::query(
-        "UPDATE devices SET ip=?, mac=?, hostname=?, vendor=?, os_family=?, device_type=?, classification_confidence=?, status=?, last_seen=?
+        "UPDATE devices SET ip=?, mac=?, hostname=?, vendor=?, os_family=?, os_version=?, device_type=?, classification_confidence=?, status=?, notes=?, last_seen=?
          WHERE id=?"
     )
     .bind(&device.ip)
@@ -56,9 +58,11 @@ pub async fn update(pool: &SqlitePool, device: &Device) -> Result<bool, sqlx::Er
     .bind(&device.hostname)
     .bind(&device.vendor)
     .bind(&device.os_family)
+    .bind(&device.os_version)
     .bind(&device.device_type)
     .bind(device.classification_confidence)
     .bind(&device.status)
+    .bind(&device.notes)
     .bind(&device.last_seen)
     .bind(&device.id)
     .execute(pool)

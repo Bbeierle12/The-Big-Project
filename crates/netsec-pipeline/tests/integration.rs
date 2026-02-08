@@ -183,3 +183,50 @@ async fn test_pipeline_scoring_critical_port() {
     // Info (0) + critical port boost (1) = Low (1)
     assert_eq!(result.severity, "low");
 }
+
+/// Verify all Suricata severity values (1-4) map to the correct output
+/// through the full normalization -> pipeline path.
+#[tokio::test]
+async fn test_pipeline_suricata_full_severity_range() {
+    let pool = create_test_pool().await.unwrap();
+    run_migrations(&pool).await.unwrap();
+    let bus = EventBus::new();
+
+    // Suricata severity 1 = Critical, 2 = High, 3 = Medium, 4 = Low
+    let cases: &[(u8, &str)] = &[
+        (1, "critical"),
+        (2, "high"),
+        (3, "medium"),
+        (4, "low"),
+    ];
+
+    for (sev, expected) in cases {
+        let event = EveEvent {
+            timestamp: Some("2024-01-15T10:00:00".to_string()),
+            event_type: Some("alert".to_string()),
+            src_ip: Some("10.0.0.1".to_string()),
+            src_port: Some(54321),
+            dest_ip: Some("10.0.0.2".to_string()),
+            dest_port: Some(80),
+            proto: Some("TCP".to_string()),
+            alert: Some(EveAlert {
+                action: Some("allowed".to_string()),
+                signature: Some(format!("ET TEST severity {sev}")),
+                signature_id: Some(3000000 + *sev as u64),
+                severity: Some(*sev),
+                category: Some("Test".to_string()),
+            }),
+        };
+
+        let alerts = normalize(ParserOutput::Suricata(event)).unwrap();
+        assert_eq!(alerts.len(), 1, "severity {sev}: expected 1 alert");
+
+        let pipeline = Pipeline::new(pool.clone(), bus.clone());
+        let result = pipeline.process(alerts.into_iter().next().unwrap()).await.unwrap();
+        assert_eq!(
+            result.severity, *expected,
+            "Suricata severity {sev} should map to {expected}, got {}",
+            result.severity
+        );
+    }
+}

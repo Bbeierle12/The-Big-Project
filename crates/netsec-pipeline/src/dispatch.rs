@@ -135,7 +135,13 @@ pub async fn dispatch(
         correlation_id,
         count: 1,
         created_at: now.clone(),
-        updated_at: now,
+        updated_at: now.clone(),
+        notes: None,
+        source_event_id: None,
+        device_id: None,
+        raw_data: Some(normalized.raw_data.to_string()),
+        first_seen: now.clone(),
+        last_seen: now,
     };
 
     for target in targets {

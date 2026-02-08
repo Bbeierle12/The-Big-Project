@@ -286,6 +286,33 @@ mod tests {
         assert!(result.hosts[0].ports.is_empty());
     }
 
+    #[test]
+    fn test_nmap_ipv6_host_fixture() {
+        let xml = include_str!("../../../tests/fixtures/nmap_ipv6_host.xml");
+        let result = parse_nmap_xml(xml).unwrap();
+        assert_eq!(result.hosts.len(), 1);
+        let host = &result.hosts[0];
+        assert_eq!(host.addresses.get("ipv6").unwrap(), "fe80::1");
+        assert_eq!(host.ports.len(), 1);
+        assert_eq!(host.ports[0].port, 22);
+    }
+
+    #[test]
+    fn test_nmap_empty_fixture() {
+        let xml = include_str!("../../../tests/fixtures/nmap_empty.xml");
+        let result = parse_nmap_xml(xml).unwrap();
+        assert!(result.hosts.is_empty());
+        assert_eq!(result.scan_info.get("scanner").unwrap(), "nmap");
+    }
+
+    #[test]
+    fn test_nmap_malformed_fixture() {
+        let xml = include_str!("../../../tests/fixtures/nmap_malformed.xml");
+        let result = parse_nmap_xml(xml);
+        // Truncated XML should produce an error
+        assert!(result.is_err());
+    }
+
     // C2: Multiple hosts
     #[test]
     fn test_nmap_multiple_hosts() {

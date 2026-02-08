@@ -80,6 +80,7 @@ pub struct Scan {
     pub tool: String,
     pub target: String,
     pub status: String,
+    /// Scan progress as a percentage, range 0.0 to 100.0.
     pub progress: f64,
     pub parameters: String,
     pub results: String,

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<nmaprun scanner="nmap" args="nmap -6 -sV fe80::1" start="1234567890" version="7.94">
+  <host>
+    <status state="up"/>
+    <address addr="fe80::1" addrtype="ipv6"/>
+    <hostnames>
+      <hostname name="ipv6-host.local" type="PTR"/>
+    </hostnames>
+    <ports>
+      <port protocol="tcp" portid="22">
+        <state state="open"/>
+        <service name="ssh" product="OpenSSH" version="9.0"/>
+      </port>
+    </ports>
+  </host>
+  <runstats>
+    <finished elapsed="1.50" summary="1 host up"/>
+    <hosts up="1" down="0" total="1"/>
+  </runstats>
+</nmaprun>

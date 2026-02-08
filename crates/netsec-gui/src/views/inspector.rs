@@ -7,6 +7,9 @@ use crate::message::{InspectorTab, Message, NodeId, Severity};
 use crate::state::network::{Connection, NetworkState, Node};
 use crate::theme::{self, colors};
 
+/// Fixed width for the inspector panel.
+pub const INSPECTOR_WIDTH: f32 = 280.0;
+
 /// Render a tab button.
 fn tab_button<'a>(
     label: &'a str,
@@ -592,7 +595,7 @@ pub fn view<'a>(
                 tab_content,
             ]
         )
-        .width(Length::Fill)
+        .width(Length::Fixed(INSPECTOR_WIDTH))
         .height(Length::Fill)
         .style(theme::panel_style)
         .into()
@@ -617,7 +620,7 @@ pub fn view<'a>(
                 .center_y(Length::Fill),
             ]
         )
-        .width(Length::Fill)
+        .width(Length::Fixed(INSPECTOR_WIDTH))
         .height(Length::Fill)
         .style(theme::panel_style)
         .into()

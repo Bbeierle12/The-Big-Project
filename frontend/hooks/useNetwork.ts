@@ -4,7 +4,7 @@ import { Node, Connection, NodeType, ApiDevice, WsDeviceEvent } from '../types';
 import { lookupOUI, randomIP, isValidCIDR } from '../utils/networkUtils';
 import { NetWatchApi } from '../services/api';
 
-// Fallback Mock Data for demo purposes if API is offline
+// Default topology shown until API devices are loaded. Persists if API is unavailable.
 const INITIAL_NODES: Node[] = [
   { 
     id: 'n1', type: 'cloud', x: 400, y: 80, label: 'ISP Gateway', status: 'online', 

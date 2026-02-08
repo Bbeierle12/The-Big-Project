@@ -5,8 +5,8 @@ use sqlx::SqlitePool;
 
 pub async fn insert(pool: &SqlitePool, alert: &Alert) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO alerts (id, severity, status, source_tool, category, title, description, device_ip, fingerprint, correlation_id, count, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO alerts (id, severity, status, source_tool, category, title, description, device_ip, fingerprint, correlation_id, count, created_at, updated_at, notes, source_event_id, device_id, raw_data, first_seen, last_seen)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&alert.id)
     .bind(&alert.severity)
@@ -21,6 +21,12 @@ pub async fn insert(pool: &SqlitePool, alert: &Alert) -> Result<(), sqlx::Error>
     .bind(alert.count)
     .bind(&alert.created_at)
     .bind(&alert.updated_at)
+    .bind(&alert.notes)
+    .bind(&alert.source_event_id)
+    .bind(&alert.device_id)
+    .bind(&alert.raw_data)
+    .bind(&alert.first_seen)
+    .bind(&alert.last_seen)
     .execute(pool)
     .await?;
     Ok(())

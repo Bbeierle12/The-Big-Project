@@ -5,8 +5,8 @@ use sqlx::SqlitePool;
 
 pub async fn insert(pool: &SqlitePool, vuln: &Vulnerability) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO vulnerabilities (id, cve_id, cvss_score, severity, title, description, device_id, port, source_tool, solution, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO vulnerabilities (id, cve_id, cvss_score, severity, title, description, device_id, port, source_tool, solution, created_at, updated_at, service, device_ip, status, references_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&vuln.id)
     .bind(&vuln.cve_id)
@@ -20,6 +20,10 @@ pub async fn insert(pool: &SqlitePool, vuln: &Vulnerability) -> Result<(), sqlx:
     .bind(&vuln.solution)
     .bind(&vuln.created_at)
     .bind(&vuln.updated_at)
+    .bind(&vuln.service)
+    .bind(&vuln.device_ip)
+    .bind(&vuln.status)
+    .bind(&vuln.references_json)
     .execute(pool)
     .await?;
     Ok(())

@@ -1,39 +1,17 @@
 """Test Nmap adapter XML parsing."""
+import os
 from netsec.adapters.nmap import Adapter
 
-SAMPLE_XML = """<?xml version="1.0"?>
-<nmaprun scanner="nmap" args="nmap -sV 192.168.1.1" start="1234567890" version="7.94">
-  <host>
-    <status state="up"/>
-    <address addr="192.168.1.1" addrtype="ipv4"/>
-    <address addr="AA:BB:CC:DD:EE:FF" addrtype="mac" vendor="TestVendor"/>
-    <hostnames>
-      <hostname name="router.local" type="PTR"/>
-    </hostnames>
-    <ports>
-      <port protocol="tcp" portid="22">
-        <state state="open"/>
-        <service name="ssh" product="OpenSSH" version="8.9"/>
-      </port>
-      <port protocol="tcp" portid="80">
-        <state state="open"/>
-        <service name="http" product="nginx" version="1.18"/>
-      </port>
-    </ports>
-    <os>
-      <osmatch name="Linux 5.x" accuracy="95"/>
-    </os>
-  </host>
-  <runstats>
-    <finished elapsed="2.50" summary="1 host up"/>
-    <hosts up="1" down="0" total="1"/>
-  </runstats>
-</nmaprun>"""
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'fixtures')
+
+def _load_fixture(name: str) -> str:
+    with open(os.path.join(FIXTURES_DIR, name), 'r') as f:
+        return f.read()
 
 
 def test_parse_nmap_xml():
     adapter = Adapter()
-    result = adapter._parse_xml(SAMPLE_XML)
+    result = adapter._parse_xml(_load_fixture('nmap_single_host.xml'))
 
     assert len(result["hosts"]) == 1
     host = result["hosts"][0]
@@ -47,3 +25,30 @@ def test_parse_nmap_xml():
     assert host["ports"][0]["service"] == "ssh"
     assert host["os"]["name"] == "Linux 5.x"
     assert result["stats"]["hosts_up"] == 1
+
+
+def test_parse_nmap_empty_scan():
+    adapter = Adapter()
+    result = adapter._parse_xml(_load_fixture('nmap_empty.xml'))
+
+    assert len(result["hosts"]) == 0
+
+
+def test_parse_nmap_host_zero_ports():
+    """Host with no open ports should parse without errors."""
+    xml = """<?xml version="1.0"?>
+<nmaprun scanner="nmap">
+  <host>
+    <status state="up"/>
+    <address addr="192.168.1.5" addrtype="ipv4"/>
+  </host>
+  <runstats>
+    <finished elapsed="1.00" summary="1 host up"/>
+    <hosts up="1" down="0" total="1"/>
+  </runstats>
+</nmaprun>"""
+    adapter = Adapter()
+    result = adapter._parse_xml(xml)
+
+    assert len(result["hosts"]) == 1
+    assert len(result["hosts"][0]["ports"]) == 0

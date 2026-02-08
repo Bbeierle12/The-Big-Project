@@ -1,0 +1,4 @@
+{"timestamp":"2024-01-15T10:00:00","event_type":"alert","src_ip":"10.0.0.1","src_port":12345,"dest_ip":"10.0.0.2","dest_port":80,"proto":"TCP","alert":{"action":"allowed","signature":"ET SCAN SYN","signature_id":2000100,"severity":2,"category":"Attempted Information Leak"}}
+this is not valid json at all
+{"truncated": true, "event_type":
+{"timestamp":"2024-01-15T10:00:02","event_type":"flow","src_ip":"10.0.0.3","src_port":54321,"dest_ip":"10.0.0.4","dest_port":443,"proto":"TCP"}
