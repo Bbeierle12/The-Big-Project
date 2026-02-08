@@ -6,8 +6,9 @@ import '@xterm/xterm/css/xterm.css';
 import { ShellInfo, TerminalSessionState } from '../types';
 import { RefreshCw } from 'lucide-react';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
-const WS_BASE = 'ws://127.0.0.1:8000';
+const API_ORIGIN = (import.meta.env.VITE_NETSEC_API_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:8420';
+const API_BASE = `${API_ORIGIN}/api`;
+const WS_BASE = (import.meta.env.VITE_NETSEC_WS_URL as string | undefined)?.replace(/\/ws$/, '') || API_ORIGIN.replace(/^http/, 'ws');
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY_MS = 2000;
 

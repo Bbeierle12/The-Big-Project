@@ -17,6 +17,10 @@ use crate::state::terminal::TerminalState;
 use crate::theme;
 use crate::views;
 
+use reqwest::Url;
+use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 /// API connection state.
@@ -126,6 +130,8 @@ pub struct NetWatch {
     ws_enabled: bool,
     /// Last auto-refresh time
     last_refresh: Instant,
+    /// Active scan ID for status polling when WS updates are unavailable
+    active_scan_id: Option<String>,
     /// Wry webview for React NetworkCanvas
     webview: Option<CanvasWebview>,
     /// Receiver for webview IPC events
@@ -143,16 +149,34 @@ impl NetWatch {
     pub fn new() -> (Self, Task<Message>) {
         let mut terminal = TerminalState::new();
         let mut network = NetworkState::new();
+        let mut startup_tasks = Vec::new();
 
         // Create initial terminal tab with default shell
         let terminal_cmd = terminal.create_default_tab();
 
-        // Create sample network for testing
-        network.create_sample_network();
+        // Optional sample network for demo/testing only
+        if Self::sample_data_enabled() {
+            network.create_sample_network();
+            tracing::warn!("Sample network is enabled (NETWATCH_ENABLE_SAMPLE_DATA)");
+        }
 
         // Load persisted settings or use defaults
         let settings = persistence::load_settings().unwrap_or_default();
         tracing::info!("Settings loaded: API URL = {}", settings.api_url);
+
+        if let Some((message, level, backend_started)) =
+            Self::ensure_local_backend_running(&settings.api_url)
+        {
+            startup_tasks.push(Task::done(Message::ShowToast(message, level)));
+            if backend_started {
+                startup_tasks.push(Task::perform(
+                    async move {
+                        tokio::time::sleep(Duration::from_secs(2)).await;
+                    },
+                    |_| Message::RefreshAll,
+                ));
+            }
+        }
 
         // Initialize API client with settings
         let api_config = ApiConfig {
@@ -160,13 +184,17 @@ impl NetWatch {
             api_key: None,
             timeout_secs: 30,
         };
-        let api_client = match ApiClient::new(api_config) {
-            Ok(client) => Some(client),
+        let (api_client, api_client_error) = match ApiClient::new(api_config) {
+            Ok(client) => (Some(client), None),
             Err(e) => {
-                tracing::error!("Failed to create API client: {}", e);
-                None
+                let message = format!("Failed to create API client: {}", e);
+                tracing::error!("{}", message);
+                (None, Some(message))
             }
         };
+        if let Some(message) = api_client_error {
+            startup_tasks.push(Task::done(Message::ShowToast(message, ToastLevel::Error)));
+        }
 
         // WebSocket config from settings
         let ws_config = WsConfig {
@@ -179,14 +207,16 @@ impl NetWatch {
         let webview_task = Self::create_webview_init_task();
 
         // Initial commands: terminal + fetch initial data + webview init
-        let init_cmd = Task::batch([
+        let mut init_tasks = vec![
             terminal_cmd,
             Task::done(Message::FetchDevices),
             Task::done(Message::FetchScans),
             Task::done(Message::FetchAlerts),
             Task::done(Message::FetchAlertStats),
             webview_task,
-        ]);
+        ];
+        init_tasks.extend(startup_tasks);
+        let init_cmd = Task::batch(init_tasks);
 
         (
             Self {
@@ -225,6 +255,7 @@ impl NetWatch {
                 ws_config,
                 ws_enabled: true,
                 last_refresh: Instant::now(),
+                active_scan_id: None,
                 webview: None,
                 webview_event_rx: None,
                 webview_initialized: false,
@@ -267,6 +298,186 @@ impl NetWatch {
     #[cfg(not(target_os = "windows"))]
     fn create_webview_init_task() -> Task<Message> {
         Task::none()
+    }
+
+    fn sample_data_enabled() -> bool {
+        std::env::var("NETWATCH_ENABLE_SAMPLE_DATA")
+            .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false)
+    }
+
+    fn infer_local_subnet_target(&self) -> String {
+        if let Some(node) = self.network.nodes.iter().find(|n| matches!(n.node_type, crate::message::NodeType::Router)) {
+            if let Some(cidr) = Self::ipv4_to_cidr24(&node.ip) {
+                return cidr;
+            }
+        }
+
+        if let Some(cidr) = self.network.nodes.iter().find_map(|n| Self::ipv4_to_cidr24(&n.ip)) {
+            return cidr;
+        }
+
+        "192.168.1.0/24".to_string()
+    }
+
+    fn ipv4_to_cidr24(ip: &str) -> Option<String> {
+        let host = ip.split('/').next()?.trim();
+        let parsed = host.parse::<Ipv4Addr>().ok()?;
+        let [a, b, c, _] = parsed.octets();
+        Some(format!("{a}.{b}.{c}.0/24"))
+    }
+
+    fn ensure_local_backend_running(api_url: &str) -> Option<(String, ToastLevel, bool)> {
+        let parsed = match Url::parse(api_url) {
+            Ok(url) => url,
+            Err(e) => {
+                return Some((
+                    format!("Invalid API URL '{}': {}", api_url, e),
+                    ToastLevel::Error,
+                    false,
+                ));
+            }
+        };
+
+        let host = parsed.host_str()?.to_ascii_lowercase();
+        if !matches!(host.as_str(), "127.0.0.1" | "localhost" | "::1") {
+            return None;
+        }
+
+        if Self::is_api_reachable(&parsed) {
+            return None;
+        }
+
+        match Self::start_local_backend_process() {
+            Ok(()) => Some((
+                "Backend not reachable; attempted auto-start with `python -m netsec`".to_string(),
+                ToastLevel::Warning,
+                true,
+            )),
+            Err(e) => Some((
+                format!(
+                    "Backend not reachable at {}. Start it with `PYTHONPATH=python python -m netsec` ({})",
+                    api_url, e
+                ),
+                ToastLevel::Error,
+                false,
+            )),
+        }
+    }
+
+    fn is_api_reachable(url: &Url) -> bool {
+        let Some(host) = url.host_str() else {
+            return false;
+        };
+        let Some(port) = url.port_or_known_default() else {
+            return false;
+        };
+
+        let Ok(mut addrs) = format!("{host}:{port}").to_socket_addrs() else {
+            return false;
+        };
+        let Some(addr) = addrs.next() else {
+            return false;
+        };
+
+        TcpStream::connect_timeout(&addr, Duration::from_millis(350)).is_ok()
+    }
+
+    fn start_local_backend_process() -> Result<(), String> {
+        let backend_cwd = Self::resolve_backend_cwd();
+        let mut launchers: Vec<(&str, &[&str])> = vec![("python", &["-m", "netsec"])];
+        #[cfg(target_os = "windows")]
+        {
+            launchers.push(("py", &["-m", "netsec"]));
+        }
+
+        let mut last_error = String::new();
+        for (bin, args) in launchers {
+            let mut cmd = Command::new(bin);
+            cmd.args(args)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+
+            if let Some(cwd) = backend_cwd.as_ref() {
+                cmd.current_dir(cwd).env("PYTHONPATH", "python");
+            }
+
+            match cmd.spawn() {
+                Ok(_) => return Ok(()),
+                Err(e) => last_error = format!("{}: {}", bin, e),
+            }
+        }
+
+        if last_error.is_empty() {
+            Err("No Python launcher available".to_string())
+        } else {
+            Err(last_error)
+        }
+    }
+
+    fn resolve_backend_cwd() -> Option<PathBuf> {
+        let cwd = std::env::current_dir().ok()?;
+        if cwd.join("python").join("netsec").exists() {
+            return Some(cwd);
+        }
+
+        let exe = std::env::current_exe().ok()?;
+        for ancestor in exe.ancestors() {
+            if ancestor.join("python").join("netsec").exists() {
+                return Some(ancestor.to_path_buf());
+            }
+        }
+
+        None
+    }
+
+    fn upsert_scan_cache(&mut self, scan: api::Scan) {
+        if let Some(pos) = self.api_state.scans.iter().position(|s| s.id == scan.id) {
+            self.api_state.scans[pos] = scan;
+        } else {
+            self.api_state.scans.insert(0, scan);
+        }
+    }
+
+    fn apply_scan_status(&mut self, scan: &api::Scan) -> Option<Task<Message>> {
+        match scan.status.as_str() {
+            "pending" | "running" => {
+                self.network.is_scanning = true;
+                self.network.scan_progress = scan.progress;
+                self.active_scan_id = Some(scan.id.clone());
+                None
+            }
+            "completed" => {
+                self.network.is_scanning = false;
+                self.network.scan_progress = 100;
+                self.active_scan_id = None;
+                Some(Task::batch([
+                    Task::done(Message::FetchDevices),
+                    Task::done(Message::FetchAlerts),
+                    Task::done(Message::FetchScans),
+                ]))
+            }
+            "failed" => {
+                self.network.is_scanning = false;
+                self.active_scan_id = None;
+                if let Some(error) = scan.error_message.clone() {
+                    self.api_state.last_error = Some(error.clone());
+                    Some(Task::done(Message::ShowToast(
+                        format!("Scan failed: {}", error),
+                        ToastLevel::Error,
+                    )))
+                } else {
+                    None
+                }
+            }
+            "cancelled" => {
+                self.network.is_scanning = false;
+                self.active_scan_id = None;
+                None
+            }
+            _ => None,
+        }
     }
 
     /// Get the window title.
@@ -379,7 +590,7 @@ impl NetWatch {
                 let scan = api::ScanCreate {
                     scan_type: "network".to_string(),
                     tool: "nmap".to_string(),
-                    target: "192.168.1.0/24".to_string(), // TODO: detect actual subnet
+                    target: self.infer_local_subnet_target(),
                     parameters: Some({
                         let mut params = std::collections::HashMap::new();
                         params.insert("scan_type".to_string(), serde_json::json!("quick"));
@@ -395,7 +606,7 @@ impl NetWatch {
                 let target = if let Some(node) = self.network.selected_node() {
                     node.ip.clone()
                 } else {
-                    "192.168.1.0/24".to_string() // TODO: detect actual subnet
+                    self.infer_local_subnet_target()
                 };
 
                 // Map scan type to nmap parameters
@@ -456,6 +667,7 @@ impl NetWatch {
             Message::ScanCompleted => {
                 self.network.is_scanning = false;
                 self.network.scan_progress = 100;
+                self.active_scan_id = None;
                 // Refresh data after scan completes
                 Task::batch([
                     Task::done(Message::FetchDevices),
@@ -758,13 +970,39 @@ impl NetWatch {
                     api_key: None,
                     timeout_secs: 30,
                 };
-                if let Ok(client) = ApiClient::new(config) {
-                    self.api_client = Some(client);
-                }
+                let client = match ApiClient::new(config) {
+                    Ok(client) => client,
+                    Err(e) => {
+                        let message = format!("Failed to apply API settings: {}", e);
+                        tracing::error!("{}", message);
+                        self.api_client = None;
+                        self.api_state.last_error = Some(message.clone());
+                        return Task::done(Message::ShowToast(message, ToastLevel::Error));
+                    }
+                };
+                self.api_client = Some(client);
                 // Update WebSocket config
                 self.ws_config.url = self.settings.ws_url.clone();
                 self.show_settings = false;
-                Task::done(Message::ShowToast("Settings saved".to_string(), ToastLevel::Success))
+
+                let mut tasks = vec![Task::done(Message::ShowToast(
+                    "Settings saved".to_string(),
+                    ToastLevel::Success,
+                ))];
+                if let Some((message, level, backend_started)) =
+                    Self::ensure_local_backend_running(&self.settings.api_url)
+                {
+                    tasks.push(Task::done(Message::ShowToast(message, level)));
+                    if backend_started {
+                        tasks.push(Task::perform(
+                            async move {
+                                tokio::time::sleep(Duration::from_secs(2)).await;
+                            },
+                            |_| Message::RefreshAll,
+                        ));
+                    }
+                }
+                Task::batch(tasks)
             }
 
             // === Notifications ===
@@ -815,6 +1053,10 @@ impl NetWatch {
                         tracing::debug!("Auto-refresh triggered");
                         tasks.push(Task::done(Message::RefreshAll));
                     }
+                }
+
+                if let Some(scan_id) = self.active_scan_id.clone() {
+                    tasks.push(Task::done(Message::FetchScan(scan_id)));
                 }
 
                 // Retry webview creation if not yet initialized
@@ -986,24 +1228,53 @@ impl NetWatch {
             Message::CreateScan(scan_create) => {
                 if let Some(client) = self.api_client.clone() {
                     self.network.is_scanning = true;
+                    self.network.scan_progress = 0;
                     Task::perform(
                         async move { client.create_scan(scan_create).await },
                         |result| Message::ScanCreated(result.map_err(|e| e.to_string())),
                     )
                 } else {
-                    Task::none()
+                    let message = "Cannot start scan: backend API client is unavailable. Check API URL and backend process.".to_string();
+                    tracing::error!("{}", message);
+                    self.network.is_scanning = false;
+                    self.active_scan_id = None;
+                    self.api_state.last_error = Some(message.clone());
+                    Task::done(Message::ShowToast(message, ToastLevel::Error))
                 }
             }
             Message::ScanCreated(result) => {
                 match result {
                     Ok(scan) => {
                         tracing::info!("Scan created: {} ({})", scan.id, scan.status);
-                        self.api_state.scans.insert(0, scan);
+                        self.upsert_scan_cache(scan.clone());
+                        if let Some(task) = self.apply_scan_status(&scan) {
+                            return task;
+                        }
                     }
                     Err(e) => {
                         tracing::error!("Failed to create scan: {}", e);
                         self.network.is_scanning = false;
-                        self.api_state.last_error = Some(e);
+                        self.active_scan_id = None;
+                        self.api_state.last_error = Some(e.clone());
+
+                        let mut tasks = vec![Task::done(Message::ShowToast(
+                            format!("Failed to create scan: {}", e),
+                            ToastLevel::Error,
+                        ))];
+                        if let Some((message, level, backend_started)) =
+                            Self::ensure_local_backend_running(&self.settings.api_url)
+                        {
+                            tasks.push(Task::done(Message::ShowToast(message, level)));
+                            if backend_started {
+                                tasks.push(Task::perform(
+                                    async move {
+                                        tokio::time::sleep(Duration::from_secs(2)).await;
+                                    },
+                                    |_| Message::RefreshAll,
+                                ));
+                            }
+                        }
+                        return Task::batch(tasks);
                     }
                 }
                 Task::none()
@@ -1046,13 +1317,15 @@ impl NetWatch {
             Message::ScanFetched(result) => {
                 match result {
                     Ok(scan) => {
-                        // Update scan in cache
-                        if let Some(pos) = self.api_state.scans.iter().position(|s| s.id == scan.id) {
-                            self.api_state.scans[pos] = scan;
+                        self.upsert_scan_cache(scan.clone());
+                        if let Some(task) = self.apply_scan_status(&scan) {
+                            return task;
                         }
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch scan: {}", e);
+                        self.network.is_scanning = false;
+                        self.active_scan_id = None;
                         self.api_state.last_error = Some(e);
                     }
                 }
@@ -1073,10 +1346,8 @@ impl NetWatch {
                     Ok(scan) => {
                         tracing::info!("Scan cancelled: {}", scan.id);
                         self.network.is_scanning = false;
-                        // Update scan in cache
-                        if let Some(pos) = self.api_state.scans.iter().position(|s| s.id == scan.id) {
-                            self.api_state.scans[pos] = scan;
-                        }
+                        self.active_scan_id = None;
+                        self.upsert_scan_cache(scan);
                     }
                     Err(e) => {
                         tracing::error!("Failed to cancel scan: {}", e);
@@ -1668,6 +1939,7 @@ impl NetWatch {
                 self.network.is_scanning = true;
                 self.network.scan_progress = 0;
                 if let Some(scan_id) = event.get_string("scan_id") {
+                    self.active_scan_id = Some(scan_id.clone());
                     Task::done(Message::FetchScan(scan_id))
                 } else {
                     Task::none()
@@ -1682,6 +1954,7 @@ impl NetWatch {
             WsEventType::ScanCompleted => {
                 self.network.is_scanning = false;
                 self.network.scan_progress = 100;
+                self.active_scan_id = None;
 
                 // Show native notification if enabled
                 if self.settings.notifications_enabled {
@@ -1699,6 +1972,7 @@ impl NetWatch {
             }
             WsEventType::ScanFailed => {
                 self.network.is_scanning = false;
+                self.active_scan_id = None;
                 if let Some(error) = event.get_string("error") {
                     tracing::error!("Scan failed: {}", error);
                     self.api_state.last_error = Some(error);

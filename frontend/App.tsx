@@ -28,8 +28,8 @@ export default function NetworkMapper() {
     saveTopology, loadTopology 
   } = useNetwork();
   
-  const { isScanning, scanProgress, scanNetwork } = useScanner(nodes, setNodes, setConnections, setSelectedIds);
-  const { executeCommand } = usePentest(setNodes);
+  const { isScanning, scanProgress, scanError, scanNetwork } = useScanner(nodes, setSelectedIds);
+  const { executeCommand } = usePentest(nodes);
   
   const {
     mode, setMode, pan, isPanning, selectionBox,
@@ -74,6 +74,7 @@ export default function NetworkMapper() {
       {/* HEADER */}
       <Header 
         isScanning={isScanning}
+        scanError={scanError}
         onScan={scanNetwork}
         onSave={saveTopology}
         onLoad={() => { if(loadTopology()) setSelectedIds([]); }}

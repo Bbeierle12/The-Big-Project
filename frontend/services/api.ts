@@ -1,8 +1,9 @@
 
 import { ApiDevice, ApiAlert, ApiScan, ScanCreateParams, ToolExecuteParams, ApiToolInfo } from '../types';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
-const WS_URL = 'ws://127.0.0.1:8000/ws';
+const API_ORIGIN = (import.meta.env.VITE_NETSEC_API_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:8420';
+const API_BASE = `${API_ORIGIN}/api`;
+const WS_URL = (import.meta.env.VITE_NETSEC_WS_URL as string | undefined) || `${API_ORIGIN.replace(/^http/, 'ws')}/ws`;
 
 export class NetWatchApi {
   private static ws: WebSocket | null = null;

@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ShellInfo, TerminalSessionState } from '../types';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_ORIGIN = (import.meta.env.VITE_NETSEC_API_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:8420';
+const API_BASE = `${API_ORIGIN}/api`;
 
 interface TerminalSessionInfo {
   session_id: string;

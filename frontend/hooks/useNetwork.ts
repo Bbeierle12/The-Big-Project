@@ -4,7 +4,9 @@ import { Node, Connection, NodeType, ApiDevice, WsDeviceEvent } from '../types';
 import { lookupOUI, randomIP, isValidCIDR } from '../utils/networkUtils';
 import { NetWatchApi } from '../services/api';
 
-// Default topology shown until API devices are loaded. Persists if API is unavailable.
+const DEMO_MODE = import.meta.env.VITE_ENABLE_DEMO_DATA === 'true';
+
+// Optional demo topology for offline mode.
 const INITIAL_NODES: Node[] = [
   { 
     id: 'n1', type: 'cloud', x: 400, y: 80, label: 'ISP Gateway', status: 'online', 
@@ -60,8 +62,8 @@ const mapApiDeviceToNode = (device: ApiDevice, existingNode?: Node): Node => {
 };
 
 export const useNetwork = () => {
-  const [nodes, setNodes] = useState<Node[]>(INITIAL_NODES);
-  const [connections, setConnections] = useState<Connection[]>(INITIAL_CONNECTIONS);
+  const [nodes, setNodes] = useState<Node[]>(DEMO_MODE ? INITIAL_NODES : []);
+  const [connections, setConnections] = useState<Connection[]>(DEMO_MODE ? INITIAL_CONNECTIONS : []);
   const [isApiConnected, setIsApiConnected] = useState(false);
 
   // Initialize API and WS
@@ -73,43 +75,49 @@ export const useNetwork = () => {
         const devices = await NetWatchApi.getDevices();
         const newNodes = devices.map(d => mapApiDeviceToNode(d));
         if (newNodes.length > 0) {
-           // Position nodes in a radial layout around gateway
-           const gateway = newNodes.find(n => n.ip?.endsWith('.1')) || newNodes[0];
-           const others = newNodes.filter(n => n.id !== gateway?.id);
+          // Position nodes in a radial layout around gateway
+          const gateway = newNodes.find(n => n.ip?.endsWith('.1')) || newNodes[0];
+          const others = newNodes.filter(n => n.id !== gateway?.id);
 
-           if (gateway) {
-             gateway.x = 400;
-             gateway.y = 200;
-             gateway.type = 'router';
-           }
+          if (gateway) {
+            gateway.x = 400;
+            gateway.y = 200;
+            gateway.type = 'router';
+          }
 
-           // Position other nodes in a circle around gateway
-           others.forEach((node, i) => {
-             const angle = (2 * Math.PI * i) / others.length;
-             const radius = 180 + Math.random() * 60;
-             node.x = 400 + Math.cos(angle) * radius;
-             node.y = 350 + Math.sin(angle) * radius;
-           });
+          // Position other nodes in a circle around gateway
+          others.forEach((node, i) => {
+            const angle = (2 * Math.PI * i) / others.length;
+            const radius = 180 + Math.random() * 60;
+            node.x = 400 + Math.cos(angle) * radius;
+            node.y = 350 + Math.sin(angle) * radius;
+          });
 
-           setNodes(newNodes);
+          setNodes(newNodes);
 
-           // Create connections from each device to gateway
-           if (gateway) {
-             const newConnections: Connection[] = others.map((node, i) => ({
-               id: `conn-${node.id}`,
-               from: gateway.id,
-               to: node.id,
-               traffic: Math.random() * 30,
-               type: 'wireless' as const,
-               speed: '100 Mbps'
-             }));
-             setConnections(newConnections);
-           }
-
-           setIsApiConnected(true);
+          // Create connections from each device to gateway
+          if (gateway) {
+            const newConnections: Connection[] = others.map((node, i) => ({
+              id: `conn-${node.id}`,
+              from: gateway.id,
+              to: node.id,
+              traffic: Math.random() * 30,
+              type: 'wireless' as const,
+              speed: '100 Mbps'
+            }));
+            setConnections(newConnections);
+          }
+        } else if (!DEMO_MODE) {
+          setNodes([]);
+          setConnections([]);
         }
+        setIsApiConnected(true);
       } catch (e) {
-        console.log("Using offline mode");
+        setIsApiConnected(false);
+        if (!DEMO_MODE) {
+          setNodes([]);
+          setConnections([]);
+        }
       }
     };
     loadDevices();

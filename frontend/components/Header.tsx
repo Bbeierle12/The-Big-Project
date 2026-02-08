@@ -4,13 +4,14 @@ import { Network, Activity, Search, FolderOpen, Save, ShieldAlert } from 'lucide
 
 interface HeaderProps {
   isScanning: boolean;
+  scanError?: string | null;
   onScan: () => void;
   onSave: () => void;
   onLoad: () => void;
   onShowVulnReport: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ isScanning, onScan, onSave, onLoad, onShowVulnReport }) => {
+export const Header: React.FC<HeaderProps> = ({ isScanning, scanError, onScan, onSave, onLoad, onShowVulnReport }) => {
   return (
     <header className="z-30 flex h-14 items-center justify-between border-b border-white/10 bg-black/80 px-6 backdrop-blur-md">
       <div className="flex items-center gap-4">
@@ -21,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ isScanning, onScan, onSave, onLo
           <h1 className="text-lg font-bold tracking-tight text-white uppercase">Archangel Deep-Scanner</h1>
           <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
             <span className={`h-1.5 w-1.5 rounded-full ${isScanning ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-            {isScanning ? 'Decoding OUI Signatures...' : 'System Primed'}
+            {scanError ? scanError : isScanning ? 'Decoding OUI Signatures...' : 'System Primed'}
           </div>
         </div>
       </div>

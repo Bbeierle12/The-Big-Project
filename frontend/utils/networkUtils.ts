@@ -1,4 +1,4 @@
-import { NodeType } from '../types';
+import { Node, NodeType } from '../types';
 
 /**
  * Look up a MAC OUI prefix by vendor name.
@@ -41,6 +41,31 @@ export const isValidCIDR = (cidr: string): boolean => {
 };
 
 export const randomIP = () => `192.168.1.${Math.floor(Math.random() * 254) + 10}`;
+
+const parseIpv4 = (ip: string): [number, number, number, number] | null => {
+  const raw = ip.split('/')[0].trim();
+  const parts = raw.split('.');
+  if (parts.length !== 4) return null;
+
+  const octets = parts.map(p => Number.parseInt(p, 10));
+  if (octets.some(n => Number.isNaN(n) || n < 0 || n > 255)) return null;
+
+  return [octets[0], octets[1], octets[2], octets[3]];
+};
+
+export const inferSubnetTarget = (nodes: Pick<Node, 'ip' | 'type'>[]): string => {
+  const routerNode = nodes.find(n => n.type === 'router' && !!n.ip);
+  const candidateIps = routerNode ? [routerNode.ip, ...nodes.map(n => n.ip)] : nodes.map(n => n.ip);
+
+  for (const ip of candidateIps) {
+    if (!ip) continue;
+    const parsed = parseIpv4(ip);
+    if (!parsed) continue;
+    return `${parsed[0]}.${parsed[1]}.${parsed[2]}.0/24`;
+  }
+
+  return '192.168.1.0/24';
+};
 
 /**
  * Pool of realistic hardware devices used for demo topology generation.
