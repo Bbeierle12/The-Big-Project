@@ -1,8 +1,53 @@
 //! API response models matching Python backend schemas.
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
+
+/// Deserialize a datetime string that may or may not include timezone info.
+/// The Python backend returns naive datetimes like "2026-01-31T20:10:37.918776"
+/// while chrono's DateTime<Utc> expects a timezone suffix.
+fn flexible_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    // Try RFC 3339 / ISO 8601 with timezone first
+    if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+    // Try naive datetime (no timezone) and assume UTC
+    if let Ok(naive) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Ok(naive.and_utc());
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S") {
+        return Ok(naive.and_utc());
+    }
+    Err(serde::de::Error::custom(format!("Cannot parse datetime: {}", s)))
+}
+
+/// Same as flexible_datetime but for Option<DateTime<Utc>>.
+fn flexible_datetime_opt<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        None => Ok(None),
+        Some(s) => {
+            if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
+                return Ok(Some(dt.with_timezone(&Utc)));
+            }
+            if let Ok(naive) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.f") {
+                return Ok(Some(naive.and_utc()));
+            }
+            if let Ok(naive) = NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S") {
+                return Ok(Some(naive.and_utc()));
+            }
+            Err(serde::de::Error::custom(format!("Cannot parse datetime: {}", s)))
+        }
+    }
+}
 
 // ============================================================================
 // System
@@ -11,6 +56,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Deserialize)]
 pub struct HealthResponse {
     pub status: String,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub timestamp: DateTime<Utc>,
 }
 
@@ -49,11 +95,15 @@ pub struct Device {
     pub os_version: Option<String>,
     pub device_type: Option<String>,
     pub status: String,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub first_seen: DateTime<Utc>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub last_seen: DateTime<Utc>,
     pub notes: Option<String>,
     pub ports: Vec<Port>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub created_at: DateTime<Utc>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -91,7 +141,9 @@ pub struct Scan {
     pub status: String,
     /// Scan progress as an integer percentage 0-100, mapped from the Python API.
     pub progress: u8,
+    #[serde(default, deserialize_with = "flexible_datetime_opt")]
     pub started_at: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "flexible_datetime_opt")]
     pub completed_at: Option<DateTime<Utc>>,
     pub result_summary: Option<String>,
     pub error_message: Option<String>,
@@ -99,7 +151,9 @@ pub struct Scan {
     pub results: Option<HashMap<String, serde_json::Value>>,
     pub devices_found: i32,
     pub alerts_generated: i32,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub created_at: DateTime<Utc>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -121,12 +175,16 @@ pub struct Alert {
     pub device_id: Option<String>,
     pub fingerprint: Option<String>,
     pub count: i32,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub first_seen: DateTime<Utc>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub last_seen: DateTime<Utc>,
     pub raw_data: Option<HashMap<String, serde_json::Value>>,
     pub correlation_id: Option<String>,
     pub notes: Option<String>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub created_at: DateTime<Utc>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -167,7 +225,9 @@ pub struct Vulnerability {
     pub source_tool: String,
     pub solution: Option<String>,
     pub references: Vec<String>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub created_at: DateTime<Utc>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -195,7 +255,9 @@ pub struct TrafficFlow {
     pub bytes_received: i64,
     pub packets_sent: i64,
     pub packets_received: i64,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub started_at: DateTime<Utc>,
+    #[serde(default, deserialize_with = "flexible_datetime_opt")]
     pub ended_at: Option<DateTime<Utc>>,
     pub application: Option<String>,
     pub country_src: Option<String>,
@@ -237,9 +299,13 @@ pub struct ScheduledJob {
     pub task_type: String,
     pub task_params: HashMap<String, serde_json::Value>,
     pub enabled: bool,
+    #[serde(default, deserialize_with = "flexible_datetime_opt")]
     pub next_run: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "flexible_datetime_opt")]
     pub last_run: Option<DateTime<Utc>>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub created_at: DateTime<Utc>,
+    #[serde(deserialize_with = "flexible_datetime")]
     pub updated_at: DateTime<Utc>,
 }
 

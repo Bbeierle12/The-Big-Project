@@ -286,6 +286,12 @@ function NetworkCanvasWidget() {
 
   return (
     <div className="relative h-full w-full bg-black overflow-hidden">
+      {/* Debug overlay */}
+      <div style={{ position: 'absolute', top: 4, left: 4, zIndex: 50, color: '#22d3ee', fontSize: 10, fontFamily: 'monospace', background: 'rgba(0,0,0,0.8)', padding: '2px 6px', borderRadius: 4 }}>
+        {nodes.length} nodes | {connections.length} conns | pan=({pan.x.toFixed(0)},{pan.y.toFixed(0)}) | zoom={zoom.toFixed(2)}
+        {nodes.length > 0 && ` | first=(${nodes[0].x.toFixed(0)},${nodes[0].y.toFixed(0)})`}
+      </div>
+
       {/* Scanning overlay */}
       {isScanning && (
         <div className="absolute top-2 right-2 z-10 bg-black/80 border border-cyan-500/30 rounded px-3 py-1">

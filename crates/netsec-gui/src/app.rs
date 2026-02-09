@@ -1132,8 +1132,9 @@ impl NetWatch {
                     Ok(devices) => {
                         tracing::info!("Fetched {} devices", devices.len());
                         self.api_state.devices = devices;
-                        // Sync to canvas
+                        // Sync to canvas and push to webview
                         self.sync_devices_to_canvas();
+                        self.sync_state_to_webview();
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch devices: {}", e);
@@ -1162,6 +1163,9 @@ impl NetWatch {
                         } else {
                             self.api_state.devices.push(device);
                         }
+                        // Sync updated device data to canvas and webview
+                        self.sync_devices_to_canvas();
+                        self.sync_state_to_webview();
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch device: {}", e);
@@ -1876,6 +1880,14 @@ impl NetWatch {
     fn sync_state_to_webview(&self) {
         if let Some(ref wv) = self.webview {
             let json = NetworkStateJson::from(&self.network);
+            tracing::info!(
+                "Syncing to webview: {} nodes, {} connections, pan=({:.0},{:.0}), zoom={:.2}",
+                json.nodes.len(),
+                json.connections.len(),
+                json.pan.0,
+                json.pan.1,
+                json.zoom,
+            );
             if let Err(e) = wv.update_state(&json) {
                 tracing::warn!("Failed to sync state to webview: {}", e);
             }
@@ -2012,6 +2024,8 @@ impl NetWatch {
                     if let Some(device) = self.api_state.devices.iter_mut().find(|d| d.id == device_id) {
                         device.status = "offline".to_string();
                     }
+                    self.sync_devices_to_canvas();
+                    self.sync_state_to_webview();
                 }
                 Task::none()
             }
@@ -2079,8 +2093,8 @@ impl NetWatch {
                 node.os_family = api_device.os_family.clone();
                 node.mac = api_device.mac_address.clone();
                 node.status = match api_device.status.as_str() {
-                    "online" => NodeStatus::Online,
-                    "offline" => NodeStatus::Offline,
+                    "online" | "up" => NodeStatus::Online,
+                    "offline" | "down" => NodeStatus::Offline,
                     "warning" => NodeStatus::Warning,
                     _ => NodeStatus::Online,
                 };
@@ -2120,8 +2134,8 @@ impl NetWatch {
                 node.hostname = api_device.hostname.clone();
                 node.os_family = api_device.os_family.clone();
                 node.status = match api_device.status.as_str() {
-                    "online" => NodeStatus::Online,
-                    "offline" => NodeStatus::Offline,
+                    "online" | "up" => NodeStatus::Online,
+                    "offline" | "down" => NodeStatus::Offline,
                     "warning" => NodeStatus::Warning,
                     _ => NodeStatus::Online,
                 };

@@ -63,3 +63,7 @@ config/local.toml
 .env
 .env.*
 !.env.example
+
+# Windows reserved device names
+nul
+tmpclaude-*-cwd
