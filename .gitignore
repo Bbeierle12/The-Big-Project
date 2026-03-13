@@ -58,6 +58,7 @@ obj/
 # ---------------------------------------------------------------------------
 netsec.db
 config/local.toml
+data/sentinel/
 
 # Environment
 .env
@@ -67,3 +68,4 @@ config/local.toml
 # Windows reserved device names
 nul
 tmpclaude-*-cwd
+The-Big-Project/
