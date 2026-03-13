@@ -8,18 +8,22 @@ import { ScanningOverlay } from './components/ScanningOverlay';
 import { NetworkCanvas } from './components/NetworkCanvas';
 import { InspectorPanel } from './components/InspectorPanel';
 import { ConsolePanel } from './components/ConsolePanel';
-import { VulnerabilityDashboard } from './components/VulnerabilityDashboard';
+import { SentinelDashboard } from './components/SentinelDashboard';
+import { OverviewDashboard } from './components/OverviewDashboard';
+import { AlertsDashboard } from './components/AlertsDashboard';
+import { VulnerabilitiesWorkspace } from './components/VulnerabilitiesWorkspace';
 
 import { useNetwork } from './hooks/useNetwork';
 import { useScanner } from './hooks/useScanner';
 import { useInteraction } from './hooks/useInteraction';
 import { usePentest } from './hooks/usePentest';
+import { AppModule } from './types';
 
 export default function NetworkMapper() {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [showVulnDashboard, setShowVulnDashboard] = useState(false);
+  const [activeModule, setActiveModule] = useState<AppModule>('overview');
 
   // Custom Hooks for Logic Separation
   const { 
@@ -73,97 +77,105 @@ export default function NetworkMapper() {
 
       {/* HEADER */}
       <Header 
+        activeModule={activeModule}
         isScanning={isScanning}
         scanError={scanError}
         onScan={scanNetwork}
         onSave={saveTopology}
         onLoad={() => { if(loadTopology()) setSelectedIds([]); }}
-        onShowVulnReport={() => setShowVulnDashboard(true)}
+        onSelectModule={setActiveModule}
       />
 
-      {/* MAIN WORKSPACE */}
-      <div className="relative flex flex-1 overflow-hidden">
-        
-        {/* SCANNING OVERLAY */}
-        <ScanningOverlay isScanning={isScanning} scanProgress={scanProgress} />
+      {/* MAIN WORKSPACE + TERMINAL */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* WORKSPACE ROW */}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          {activeModule === 'network' ? (
+            <>
+              <ScanningOverlay isScanning={isScanning} scanProgress={scanProgress} />
 
-        {/* TOOLBAR */}
-        <Toolbar 
-          mode={mode}
-          setMode={setMode}
-          onAddNode={handleAddNode}
-          onGroup={handleCreateGroup}
-          onDelete={handleDelete}
-          onPentest={(tool) => executeCommand(tool, selectedIds)}
-        />
+              <Toolbar
+                mode={mode}
+                setMode={setMode}
+                onAddNode={handleAddNode}
+                onGroup={handleCreateGroup}
+                onDelete={handleDelete}
+                onPentest={(tool) => executeCommand(tool, selectedIds)}
+              />
 
-        {/* CANVAS */}
-        <div className="relative flex-1 bg-[#050505] overflow-hidden">
-           <div className="absolute inset-0 opacity-10 pointer-events-none" 
-                style={{ 
-                  backgroundImage: `linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)`, 
-                  backgroundSize: '40px 40px',
-                  backgroundPosition: `${pan.x}px ${pan.y}px`
-                }} 
-           />
-           
-           <NetworkCanvas 
-             ref={svgRef}
-             nodes={nodes}
-             connections={connections}
-             pan={pan}
-             isPanning={isPanning}
-             selectedIds={selectedIds}
-             selectionBox={selectionBox}
-             hoveredConnection={hoveredConnection}
-             setHoveredConnection={setHoveredConnection}
-             onMouseDown={handleMouseDown}
-             onMouseMove={handleMouseMove}
-             onMouseUp={handleMouseUp}
-             onNodeDown={handleNodeDown}
-           />
+              <div className="relative flex-1 bg-[#050505] overflow-hidden">
+                <div
+                  className="absolute inset-0 opacity-10 pointer-events-none"
+                  style={{
+                    backgroundImage: `linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)`,
+                    backgroundSize: '40px 40px',
+                    backgroundPosition: `${pan.x}px ${pan.y}px`
+                  }}
+                />
+
+                <NetworkCanvas
+                  ref={svgRef}
+                  nodes={nodes}
+                  connections={connections}
+                  pan={pan}
+                  isPanning={isPanning}
+                  selectedIds={selectedIds}
+                  selectionBox={selectionBox}
+                  hoveredConnection={hoveredConnection}
+                  setHoveredConnection={setHoveredConnection}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onNodeDown={handleNodeDown}
+                />
+              </div>
+
+              {selectedNode && (
+                <InspectorPanel
+                  selectedNode={selectedNode}
+                  nodes={nodes}
+                  connections={connections}
+                  hoveredConnection={hoveredConnection}
+                  setHoveredConnection={setHoveredConnection}
+                  onClose={() => setSelectedIds([])}
+                />
+              )}
+
+              {selectedIds.length > 1 && (
+                <div className="z-30 w-80 border-l border-white/10 bg-black/90 p-6 flex flex-col items-center justify-center text-center">
+                  <div className="mb-4 p-4 rounded-full bg-cyan-500/10 text-cyan-400">
+                    <Layers size={32} />
+                  </div>
+                  <h2 className="text-lg font-bold text-white mb-2">Multiple Selection</h2>
+                  <p className="text-xs text-slate-400 mb-6">{selectedIds.length} nodes selected. Group them to organize your topology.</p>
+
+                  <button
+                    onClick={handleCreateGroup}
+                    className="flex items-center gap-2 rounded bg-cyan-600 px-6 py-2 text-xs font-bold text-white hover:bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                  >
+                    <FolderPlus size={14} /> CREATE GROUP
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex-1 overflow-hidden">
+              {activeModule === 'overview' ? <OverviewDashboard onSelectModule={setActiveModule} /> : null}
+              {activeModule === 'desktop_safety' ? (
+                <SentinelDashboard
+                  embedded
+                  onShowVulnReport={() => setActiveModule('vulnerabilities')}
+                />
+              ) : null}
+              {activeModule === 'vulnerabilities' ? <VulnerabilitiesWorkspace /> : null}
+              {activeModule === 'alerts' ? <AlertsDashboard /> : null}
+            </div>
+          )}
         </div>
 
-        {/* INSPECTOR */}
-        {selectedNode && (
-          <InspectorPanel 
-            selectedNode={selectedNode}
-            nodes={nodes}
-            connections={connections}
-            hoveredConnection={hoveredConnection}
-            setHoveredConnection={setHoveredConnection}
-            onClose={() => setSelectedIds([])}
-          />
-        )}
-        
-        {selectedIds.length > 1 && (
-           <div className="z-30 w-80 border-l border-white/10 bg-black/90 p-6 backdrop-blur-md flex flex-col items-center justify-center text-center">
-              <div className="mb-4 p-4 rounded-full bg-cyan-500/10 text-cyan-400">
-                <Layers size={32} />
-              </div>
-              <h2 className="text-lg font-bold text-white mb-2">Multiple Selection</h2>
-              <p className="text-xs text-slate-400 mb-6">{selectedIds.length} nodes selected. Group them to organize your topology.</p>
-              
-              <button 
-                onClick={handleCreateGroup}
-                className="flex items-center gap-2 rounded bg-cyan-600 px-6 py-2 text-xs font-bold text-white hover:bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
-              >
-                <FolderPlus size={14} /> CREATE GROUP
-              </button>
-           </div>
-        )}
+        {/* CONSOLE PANEL - below the workspace row, never overlaps sidebar */}
+        <ConsolePanel />
       </div>
-
-      {/* CONSOLE PANEL - Docked at bottom */}
-      <ConsolePanel />
-
-      {/* DASHBOARD OVERLAY */}
-      {showVulnDashboard && (
-        <VulnerabilityDashboard
-          nodes={nodes}
-          onClose={() => setShowVulnDashboard(false)}
-        />
-      )}
     </div>
   );
 }

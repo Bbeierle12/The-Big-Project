@@ -89,7 +89,7 @@ export const ConsolePanel: React.FC = () => {
   }, []);
 
   return (
-    <div className="z-40 flex flex-col border-t border-white/10 bg-black/95 backdrop-blur-md">
+    <div className="z-40 flex flex-col border-t border-cyan-500/20 bg-[#07090d] shadow-[0_-2px_10px_rgba(0,0,0,0.6)]">
       {/* Header bar with collapse toggle */}
       <div
         className="flex items-center justify-between px-4 py-1.5 bg-slate-900/80 border-b border-white/5 cursor-pointer hover:bg-slate-800/80 transition-colors"

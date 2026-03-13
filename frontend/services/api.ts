@@ -1,5 +1,18 @@
 
-import { ApiDevice, ApiAlert, ApiScan, ScanCreateParams, ToolExecuteParams, ApiToolInfo } from '../types';
+import {
+  ApiAlert,
+  ApiDevice,
+  ApiScan,
+  ApiToolInfo,
+  ApiVulnerability,
+  AlertStats,
+  ScanCreateParams,
+  SentinelCollectResult,
+  SentinelCorrelationResult,
+  SentinelStatus,
+  SentinelVulnReport,
+  ToolExecuteParams,
+} from '../types';
 
 const API_ORIGIN = (import.meta.env.VITE_NETSEC_API_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:8420';
 const API_BASE = `${API_ORIGIN}/api`;
@@ -168,7 +181,7 @@ export class NetWatchApi {
     return res.json();
   }
 
-  static async getAlertStats(): Promise<Record<string, number>> {
+  static async getAlertStats(): Promise<AlertStats> {
     const res = await fetch(`${API_BASE}/alerts/stats`, { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch alert stats');
     return res.json();
@@ -181,6 +194,96 @@ export class NetWatchApi {
       body: JSON.stringify(updates)
     });
     if (!res.ok) throw new Error(`Failed to update alert ${alertId}`);
+    return res.json();
+  }
+
+  // ============ Vulnerabilities ============
+
+  static async getVulnerabilities(params?: { severity?: string; status?: string; offset?: number; limit?: number }): Promise<ApiVulnerability[]> {
+    const query = new URLSearchParams();
+    if (params?.severity) query.set('severity', params.severity);
+    if (params?.status) query.set('status', params.status);
+    if (params?.offset) query.set('offset', String(params.offset));
+    if (params?.limit) query.set('limit', String(params.limit));
+
+    const url = `${API_BASE}/vulnerabilities${query.toString() ? '?' + query : ''}`;
+    const res = await fetch(url, { headers: this.getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch vulnerabilities');
+    return res.json();
+  }
+
+  // ============ Sentinel ============
+
+  static async getSentinelStatus(): Promise<SentinelStatus> {
+    const res = await fetch(`${API_BASE}/sentinel/status`, { headers: this.getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch Sentinel status');
+    return res.json();
+  }
+
+  static async collectSentinel(): Promise<SentinelCollectResult> {
+    const res = await fetch(`${API_BASE}/sentinel/collect`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to collect Sentinel snapshots');
+    return res.json();
+  }
+
+  static async refreshSentinelFeeds(force = true): Promise<Record<string, unknown>> {
+    const res = await fetch(`${API_BASE}/sentinel/osint/feeds`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ force }),
+    });
+    if (!res.ok) throw new Error('Failed to refresh Sentinel feeds');
+    return res.json();
+  }
+
+  static async getSentinelVulns(limit = 25): Promise<SentinelVulnReport> {
+    const res = await fetch(`${API_BASE}/sentinel/vulns?limit=${limit}`, { headers: this.getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch Sentinel vulnerabilities');
+    return res.json();
+  }
+
+  static async scanSentinelVulns(params?: { force?: boolean; refresh_feeds?: boolean }): Promise<Record<string, unknown>> {
+    const res = await fetch(`${API_BASE}/sentinel/vulns/scan`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        force: params?.force ?? false,
+        refresh_feeds: params?.refresh_feeds ?? true,
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to run Sentinel vulnerability scan');
+    return res.json();
+  }
+
+  static async correlateSentinel(params?: { refresh_feeds?: boolean; scan_vulns?: boolean; ingest_alerts?: boolean }): Promise<SentinelCorrelationResult> {
+    const res = await fetch(`${API_BASE}/sentinel/correlate`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        refresh_feeds: params?.refresh_feeds ?? true,
+        scan_vulns: params?.scan_vulns ?? true,
+        ingest_alerts: params?.ingest_alerts ?? true,
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to run Sentinel correlation');
+    return res.json();
+  }
+
+  // ============ Overview ============
+
+  static async getOverview(): Promise<{
+    health: { status: string; version: string };
+    alerts: ApiAlert[];
+    alert_stats: AlertStats;
+    scans: ApiScan[];
+    sentinel: SentinelStatus;
+    tools_health: Array<{ name: string; status: string }>;
+  }> {
+    const res = await fetch(`${API_BASE}/overview`, { headers: this.getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch overview');
     return res.json();
   }
 
@@ -204,7 +307,7 @@ export class NetWatchApi {
     this.ws = new WebSocket(WS_URL);
 
     this.ws.onopen = () => {
-      console.log('NetWatch Agent Connected');
+      console.log('NetSec Agent Connected');
       this.emit('system.startup', null);
     };
 
@@ -221,7 +324,7 @@ export class NetWatchApi {
     };
 
     this.ws.onclose = () => {
-      console.log('NetWatch Agent Disconnected');
+      console.log('NetSec Agent Disconnected');
       this.emit('system.shutdown', null);
       setTimeout(() => this.connectWS(), 5000); // Reconnect
     };

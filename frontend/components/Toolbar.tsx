@@ -18,7 +18,7 @@ interface ToolbarProps {
 
 export const Toolbar: React.FC<ToolbarProps> = ({ mode, setMode, onAddNode, onGroup, onDelete, onPentest }) => {
   return (
-    <div className="z-30 flex w-20 flex-col items-center gap-2 border-r border-white/10 bg-black/60 py-3 px-1 backdrop-blur-sm">
+    <div className="z-30 flex w-20 flex-col items-center gap-2 border-r border-white/10 bg-black/90 py-3 px-1 overflow-y-auto">
       <ToolButton active={mode === 'select'} icon={MousePointer} label="Select" onClick={() => setMode('select')} />
       <ToolButton active={mode === 'connect'} icon={Share2} label="Link" onClick={() => setMode('connect')} />
 
