@@ -72,6 +72,7 @@ pub struct NetsecEngine {
     scanner: ActiveScanner,
     scheduler: Scheduler,
     plugin_registry: PluginRegistry,
+    metadata_engine: netsec_metadata::MetadataEngine,
     scheduler_handle: Option<JoinHandle<()>>,
 }
 
@@ -106,6 +107,8 @@ impl NetsecEngine {
 
         let plugin_registry = PluginRegistry::new();
 
+        let metadata_engine = netsec_metadata::MetadataEngine::with_defaults();
+
         Ok(Self {
             config,
             pool,
@@ -114,6 +117,7 @@ impl NetsecEngine {
             scanner,
             scheduler,
             plugin_registry,
+            metadata_engine,
             scheduler_handle: None,
         })
     }
@@ -145,6 +149,8 @@ impl NetsecEngine {
 
         let plugin_registry = PluginRegistry::new();
 
+        let metadata_engine = netsec_metadata::MetadataEngine::with_defaults();
+
         Ok(Self {
             config,
             pool,
@@ -153,6 +159,7 @@ impl NetsecEngine {
             scanner,
             scheduler,
             plugin_registry,
+            metadata_engine,
             scheduler_handle: None,
         })
     }
@@ -245,6 +252,44 @@ impl NetsecEngine {
     /// Mutable reference to the plugin registry.
     pub fn plugin_registry_mut(&mut self) -> &mut PluginRegistry {
         &mut self.plugin_registry
+    }
+
+    /// Reference to the metadata extraction engine.
+    pub fn metadata_engine(&self) -> &netsec_metadata::MetadataEngine {
+        &self.metadata_engine
+    }
+
+    /// Extract metadata from a file, run security analysis, and publish a
+    /// `MetadataExtracted` event on the event bus.
+    ///
+    /// Returns the full analysis tuple: (metadata, analysis, optional alert).
+    pub fn extract_metadata(
+        &self,
+        path: &str,
+    ) -> netsec_metadata::MetadataResult<(
+        netsec_metadata::ExtractedMetadata,
+        netsec_metadata::MetadataAnalysis,
+        Option<NormalizedAlert>,
+    )> {
+        let opts = netsec_metadata::types::ExtractOptions::default();
+        let result = self.metadata_engine.analyze(path, &opts)?;
+
+        // Publish MetadataExtracted event with summary payload.
+        let (ref meta, ref analysis, ref alert) = result;
+        let event = NetsecEvent::new(
+            EventType::MetadataExtracted,
+            serde_json::json!({
+                "file": meta.file.name,
+                "mime": meta.format.mime,
+                "risk_score": analysis.risk_score,
+                "severity": analysis.severity,
+                "flags": analysis.flags.flag_count(),
+                "alert_generated": alert.is_some(),
+            }),
+        );
+        let _ = self.event_bus.publish(event);
+
+        Ok(result)
     }
 }
 
@@ -348,6 +393,53 @@ mod tests {
     #[tokio::test]
     async fn test_engine_invalid_config_dir() {
         let result = NetsecEngine::new(Some(Path::new("/nonexistent/config/dir"))).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_engine_metadata_engine_accessor() {
+        let engine = test_engine().await;
+
+        // metadata_engine is accessible and supports expected types
+        let me = engine.metadata_engine();
+        assert!(me.is_supported("image/jpeg", ".jpg"));
+        assert!(me.is_supported("image/png", ".png"));
+        assert!(!me.is_supported("application/pdf", ".pdf"));
+    }
+
+    #[tokio::test]
+    async fn test_engine_extract_metadata_real_png() {
+        let engine = test_engine().await;
+
+        // Subscribe to capture the MetadataExtracted event
+        let mut rx = engine.event_bus().subscribe();
+
+        // Create a minimal PNG
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("engine_test.png");
+        image::RgbImage::new(1, 1).save(&path).unwrap();
+
+        let (meta, analysis, alert) = engine
+            .extract_metadata(path.to_str().unwrap())
+            .unwrap();
+
+        assert_eq!(meta.file.name, "engine_test.png");
+        assert_eq!(meta.format.mime, "image/png");
+        assert_eq!(analysis.risk_score, 0.0);
+        assert!(alert.is_none());
+
+        // Verify a MetadataExtracted event was published
+        let event = rx.recv().await.unwrap();
+        assert_eq!(event.event_type, EventType::MetadataExtracted);
+        assert_eq!(event.payload["file"], "engine_test.png");
+        assert_eq!(event.payload["mime"], "image/png");
+        assert_eq!(event.payload["alert_generated"], false);
+    }
+
+    #[tokio::test]
+    async fn test_engine_extract_metadata_nonexistent() {
+        let engine = test_engine().await;
+        let result = engine.extract_metadata("/tmp/does_not_exist_netsec.jpg");
         assert!(result.is_err());
     }
 

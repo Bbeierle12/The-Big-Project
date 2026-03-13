@@ -10,6 +10,7 @@ pub use netsec_scanner as scanner;
 pub use netsec_scheduler as scheduler;
 pub use netsec_platform as platform;
 pub use netsec_threat as threat;
+pub use netsec_metadata as metadata;
 
 pub mod engine;
 pub mod config;

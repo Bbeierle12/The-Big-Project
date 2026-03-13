@@ -32,6 +32,8 @@ class EventType(StrEnum):
     # Tool events
     TOOL_ONLINE = "tool.online"
     TOOL_OFFLINE = "tool.offline"
+    # Metadata events
+    METADATA_EXTRACTED = "metadata.extracted"
     # System events
     SYSTEM_STARTUP = "system.startup"
     SYSTEM_SHUTDOWN = "system.shutdown"

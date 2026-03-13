@@ -21,6 +21,7 @@ pub enum PluginCategory {
     WebScanner,
     CredentialTester,
     ReportGenerator,
+    MetadataExtractor,
 }
 
 /// Plugin operational status.

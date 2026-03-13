@@ -199,7 +199,7 @@ def create_app() -> FastAPI:
     from netsec.api.routers import (
         system, tools, scans, devices, alerts,
         scheduler, vulnerabilities, traffic, ws, terminal, sentinel,
-        overview,
+        overview, metadata,
     )
     app.include_router(overview.router, prefix="/api/overview", tags=["overview"])
     app.include_router(system.router, prefix="/api/system", tags=["system"])
@@ -212,6 +212,7 @@ def create_app() -> FastAPI:
     app.include_router(traffic.router, prefix="/api/traffic", tags=["traffic"])
     app.include_router(terminal.router, prefix="/api/terminal", tags=["terminal"])
     app.include_router(sentinel.router, prefix="/api/sentinel", tags=["sentinel"])
+    app.include_router(metadata.router, prefix="/api/metadata", tags=["metadata"])
     app.include_router(ws.router)
 
     return app

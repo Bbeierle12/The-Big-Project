@@ -19,6 +19,7 @@ pub enum EventType {
     ScanFailed,
     ThreatDetected,
     SystemHealth,
+    MetadataExtracted,
 }
 
 /// An event emitted on the event bus.

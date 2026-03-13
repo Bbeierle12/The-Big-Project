@@ -15,6 +15,7 @@ members = [
     "crates/netsec-ffi",
     "crates/netsec-pty",
     "crates/netsec-gui",
+    "crates/netsec-metadata",
 ]
 exclude = [
     "frontend/src-tauri",
@@ -38,6 +39,7 @@ netsec-platform = { path = "crates/netsec-platform" }
 netsec-threat = { path = "crates/netsec-threat" }
 netsec-core = { path = "crates/netsec-core" }
 netsec-pty = { path = "crates/netsec-pty" }
+netsec-metadata = { path = "crates/netsec-metadata" }
 
 # Shared external dependencies
 serde = { version = "1", features = ["derive"] }
@@ -55,3 +57,11 @@ quick-xml = { version = "0.36", features = ["serialize"] }
 config = "0.14"
 socket2 = "0.5"
 async-trait = "0.1"
+
+# Image / metadata extraction
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "tiff", "bmp", "webp"] }
+kamadak-exif = "0.5"
+sha2 = "0.10"
+md-5 = "0.10"
+hex = "0.4"
+mime_guess = "2.0"
