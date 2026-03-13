@@ -147,13 +147,13 @@ impl CanvasWebview {
         })
     }
 
-    /// Create a new CanvasWebview (unsupported platforms).
+    /// Create a new CanvasWebview (macOS — not yet implemented).
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     pub fn new(
-        _parent_handle: isize,
+        _parent: isize,
         _event_tx: mpsc::Sender<WebviewEvent>,
     ) -> Result<Self, WebviewError> {
-        Err(WebviewError::Custom("Unsupported platform".into()))
+        Err(WebviewError::NotReady)
     }
 
     /// Mark the webview as ready (called when we receive Ready event).
@@ -242,8 +242,7 @@ impl CanvasWebview {
     }
 }
 
-/// Wrapper for parent window handle on Windows.
-#[cfg(target_os = "windows")]
+/// Wrapper for parent window handle.
 struct ParentWindow(isize);
 
 #[cfg(target_os = "windows")]
@@ -261,10 +260,6 @@ impl raw_window_handle::HasWindowHandle for ParentWindow {
         Ok(unsafe { raw_window_handle::WindowHandle::borrow_raw(raw) })
     }
 }
-
-/// Wrapper for parent window handle on Linux (X11).
-#[cfg(target_os = "linux")]
-struct ParentWindow(isize);
 
 #[cfg(target_os = "linux")]
 impl raw_window_handle::HasWindowHandle for ParentWindow {
