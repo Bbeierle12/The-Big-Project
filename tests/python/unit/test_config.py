@@ -1,5 +1,4 @@
 """Test configuration loading."""
-import pytest
 from pathlib import Path
 from netsec.core.config import load_settings, Settings
 
@@ -10,6 +9,11 @@ def test_default_settings():
     assert settings.server.host == "127.0.0.1"
     assert settings.server.port == 8420
     assert settings.database.url.startswith("sqlite")
+    assert settings.sentinel.enabled is True
+    assert settings.sentinel.collect_interval_secs == 300
+    assert settings.sentinel.osint.feeds.enable_threatfox is False
+    assert settings.sentinel.osint.apis.threatfox_auth_key == ""
+    assert settings.sentinel.osint.dnsbl.enabled is True
 
 
 def test_load_from_config_dir(tmp_path: Path):
@@ -41,3 +45,22 @@ port = 9999
     settings = load_settings(config_dir=tmp_path)
     assert settings.server.host == "127.0.0.1"  # from default
     assert settings.server.port == 9999  # overridden
+
+
+def test_sentinel_overrides(tmp_path: Path):
+    """Sentinel config should load nested sections correctly."""
+    default = tmp_path / "default.toml"
+    default.write_text("""
+[sentinel]
+enabled = true
+
+[sentinel.osint]
+feed_refresh_hours = 12
+
+[sentinel.osint.apis]
+abuseipdb_key = "abc123"
+""")
+    settings = load_settings(config_dir=tmp_path)
+    assert settings.sentinel.enabled is True
+    assert settings.sentinel.osint.feed_refresh_hours == 12
+    assert settings.sentinel.osint.apis.abuseipdb_key == "abc123"

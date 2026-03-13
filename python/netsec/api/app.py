@@ -15,6 +15,8 @@ from netsec.db.session import init_db, close_db, get_session_context
 from netsec.adapters.registry import AdapterRegistry
 from netsec.api.websocket import register_ws_forwarding
 from netsec.services.monitoring_service import MonitoringService
+from netsec.sentinel.alerts import ingest_raw_alerts
+from netsec.adapters.base import ToolStatus
 
 
 @asynccontextmanager
@@ -58,7 +60,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             elif task_type == "tool_health_check":
                 service = MonitoringService(session, event_bus, registry)
                 # Restore previous state for delta detection
-                from netsec.adapters.base import ToolStatus
                 service._previous_tool_status = {
                     k: ToolStatus(v) for k, v in _tool_status_cache.items()
                 }
@@ -71,6 +72,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             elif task_type == "scan":
                 # For future scheduled scans
                 pass
+            elif task_type == "sentinel_collect":
+                adapter = registry.get("sentinel")
+                if adapter is not None:
+                    await adapter.execute("collect", {})
+            elif task_type == "sentinel_feeds":
+                adapter = registry.get("sentinel")
+                if adapter is not None:
+                    await adapter.execute("feeds_update", {"force": False})
+            elif task_type == "sentinel_vuln_scan":
+                adapter = registry.get("sentinel")
+                if adapter is not None:
+                    await adapter.execute("vuln_scan", {"force": False, "refresh_feeds": True})
+            elif task_type == "sentinel_correlate":
+                adapter = registry.get("sentinel")
+                if adapter is not None:
+                    result = await adapter.execute(
+                        "correlate",
+                        {"refresh_feeds": True, "scan_vulns": True},
+                    )
+                    await ingest_raw_alerts(
+                        session=session,
+                        event_bus=event_bus,
+                        alerts=list(result.get("alerts", [])),
+                        source_tool="sentinel",
+                    )
 
     scheduler.set_task_handler(task_handler)
     await scheduler.start()
@@ -91,6 +117,35 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         task_type="tool_health_check",
         task_params={},
     )
+    if settings.sentinel.enabled:
+        scheduler.add_job(
+            name="Sentinel Collection",
+            trigger_type="interval",
+            trigger_args={"seconds": max(settings.sentinel.collect_interval_secs, 60)},
+            task_type="sentinel_collect",
+            task_params={},
+        )
+        scheduler.add_job(
+            name="Sentinel Feeds",
+            trigger_type="interval",
+            trigger_args={"hours": max(settings.sentinel.osint.feed_refresh_hours, 1)},
+            task_type="sentinel_feeds",
+            task_params={},
+        )
+        scheduler.add_job(
+            name="Sentinel Vulnerability Scan",
+            trigger_type="cron",
+            trigger_args={"hour": 4, "minute": 0},
+            task_type="sentinel_vuln_scan",
+            task_params={},
+        )
+        scheduler.add_job(
+            name="Sentinel Correlate",
+            trigger_type="interval",
+            trigger_args={"minutes": 10},
+            task_type="sentinel_correlate",
+            task_params={},
+        )
 
     # Publish system startup event
     await event_bus.publish(Event(
@@ -143,8 +198,10 @@ def create_app() -> FastAPI:
     # Register routers
     from netsec.api.routers import (
         system, tools, scans, devices, alerts,
-        scheduler, vulnerabilities, traffic, ws, terminal,
+        scheduler, vulnerabilities, traffic, ws, terminal, sentinel,
+        overview,
     )
+    app.include_router(overview.router, prefix="/api/overview", tags=["overview"])
     app.include_router(system.router, prefix="/api/system", tags=["system"])
     app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
     app.include_router(scans.router, prefix="/api/scans", tags=["scans"])
@@ -154,6 +211,7 @@ def create_app() -> FastAPI:
     app.include_router(vulnerabilities.router, prefix="/api/vulnerabilities", tags=["vulnerabilities"])
     app.include_router(traffic.router, prefix="/api/traffic", tags=["traffic"])
     app.include_router(terminal.router, prefix="/api/terminal", tags=["terminal"])
+    app.include_router(sentinel.router, prefix="/api/sentinel", tags=["sentinel"])
     app.include_router(ws.router)
 
     return app

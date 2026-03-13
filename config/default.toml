@@ -35,3 +35,74 @@ email_to = ""
 [tools]
 scan_timeout = 300
 max_concurrent_scans = 3
+
+[sentinel]
+enabled = true
+retention_days = 30
+collect_interval_secs = 300
+
+[sentinel.process]
+root_allowlist = [
+    "systemd", "cron", "sshd", "NetworkManager", "thermald",
+    "irqbalance", "rsyslogd", "cupsd", "lightdm", "Xorg",
+    "cinnamon", "polkitd", "udisksd", "upowerd", "dbus-daemon",
+    "ollama", "uvicorn", "postgres", "redis-server"
+]
+
+[sentinel.network]
+known_listeners = [22, 53, 631, 3001, 3002, 5110, 5432, 5433, 6379, 8080, 8420, 11434, 18789, 18791, 18792]
+
+[sentinel.files]
+watch_paths = [
+    "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow",
+    "/etc/sudoers", "/etc/hosts", "/etc/resolv.conf",
+    "/etc/ssh/sshd_config", "/etc/pam.d/common-auth",
+    "/etc/ld.so.preload", "/etc/ld.so.conf",
+    "/etc/rc.local", "/etc/crontab", "/etc/environment",
+    "/etc/profile", "/etc/bash.bashrc"
+]
+scan_tmp = true
+scan_dev_shm = true
+
+[sentinel.osint]
+feed_refresh_hours = 6
+reputation_cache_ttl_hours = 24
+skip_private_ips = true
+known_good_cidrs = [
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "100.64.0.0/10"
+]
+extra_ip_feeds = []
+extra_domain_feeds = []
+extra_hash_feeds = []
+cache_dir = "data/sentinel"
+
+[sentinel.osint.feeds]
+enable_threatfox = false
+enable_urlhaus = true
+enable_feodo = true
+enable_sslbl = true
+enable_cisa_kev = true
+enable_osv = true
+
+[sentinel.osint.apis]
+threatfox_auth_key = ""
+abuseipdb_key = ""
+virustotal_key = ""
+greynoise_key = ""
+otx_key = ""
+nvd_key = ""
+
+[sentinel.osint.dnsbl]
+enabled = true
+lists = ["zen.spamhaus.org", "b.barracudacentral.org", "dnsbl.sorbs.net", "bl.spamcop.net"]
+
+[sentinel.osint.domains]
+monitor = []
+
+[sentinel.osint.vuln]
+enable_osv = true
+scan_interval_hours = 24

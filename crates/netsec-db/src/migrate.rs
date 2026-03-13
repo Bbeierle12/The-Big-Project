@@ -17,6 +17,12 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("011_add_device_fields", include_str!("../../../migrations/sql/011_add_device_fields.sql")),
     ("012_add_alert_fields", include_str!("../../../migrations/sql/012_add_alert_fields.sql")),
     ("013_add_vuln_fields", include_str!("../../../migrations/sql/013_add_vuln_fields.sql")),
+    ("014_create_sentinel_snapshots", include_str!("../../../migrations/sql/014_create_sentinel_snapshots.sql")),
+    ("015_create_sentinel_file_hashes", include_str!("../../../migrations/sql/015_create_sentinel_file_hashes.sql")),
+    ("016_create_sentinel_auth_events", include_str!("../../../migrations/sql/016_create_sentinel_auth_events.sql")),
+    ("017_create_sentinel_persistence", include_str!("../../../migrations/sql/017_create_sentinel_persistence.sql")),
+    ("018_create_sentinel_baselines", include_str!("../../../migrations/sql/018_create_sentinel_baselines.sql")),
+    ("019_create_sentinel_osint", include_str!("../../../migrations/sql/019_create_sentinel_osint.sql")),
 ];
 
 /// Run all migrations against the database.

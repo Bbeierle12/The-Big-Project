@@ -35,11 +35,104 @@ export interface ApiAlert {
   id: string;
   title: string;
   description: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: 'low' | 'medium' | 'high' | 'critical' | 'info';
   status: string;
   source_tool: string;
+  source_event_id?: string;
+  category?: string;
   device_ip?: string;
+  fingerprint?: string;
+  count: number;
+  first_seen: string;
+  last_seen: string;
+  raw_data?: Record<string, unknown>;
+  correlation_id?: string;
   notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SentinelFeedMetadataEntry {
+  name: string;
+  status: string;
+  updated_at: string;
+  counts: Record<string, number>;
+  file: string;
+  message?: string;
+}
+
+export interface SentinelFeedsStatus {
+  metadata: Record<string, SentinelFeedMetadataEntry>;
+  ioc_counts: Record<string, number>;
+}
+
+export interface SentinelVulnerabilityMatch {
+  id: string;
+  timestamp: string;
+  package: string;
+  version: string;
+  cve_id: string;
+  severity: string;
+  source: string;
+  exploited: number;
+  detail: string;
+}
+
+export interface SentinelSnapshotStatus {
+  process?: string | null;
+  network?: string | null;
+  file_hashes?: string | null;
+  auth?: string | null;
+  persistence?: string | null;
+  metrics?: string | null;
+}
+
+export interface SentinelStatus {
+  enabled: boolean;
+  db_path: string;
+  snapshots: SentinelSnapshotStatus;
+  feeds: SentinelFeedsStatus;
+  recent_vulns: SentinelVulnerabilityMatch[];
+}
+
+export interface SentinelCollectResult {
+  timestamp: string;
+  counts: Record<string, number>;
+  warnings: string[];
+  pruned: Record<string, number>;
+}
+
+export interface SentinelCorrelationResult {
+  count: number;
+  warnings: string[];
+  alerts: Record<string, unknown>[];
+  ingestion?: {
+    submitted: number;
+    created: number;
+    deduped: number;
+    alert_ids: string[];
+  };
+}
+
+export interface SentinelVulnReport {
+  rows: SentinelVulnerabilityMatch[];
+}
+
+export interface ApiVulnerability {
+  id: string;
+  title: string;
+  description?: string;
+  cve_id?: string;
+  cvss_score?: number;
+  severity: 'low' | 'medium' | 'high' | 'critical' | 'info';
+  status: string;
+  device_id?: string;
+  device_ip?: string;
+  port?: number;
+  service?: string;
+  source_tool: string;
+  solution?: string;
+  references?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -71,6 +164,12 @@ export interface ApiToolInfo {
   version?: string;
   status: string;
   supported_tasks: string[];
+}
+
+export interface AlertStats {
+  total: number;
+  open_by_severity: Record<string, number>;
+  open_by_tool: Record<string, number>;
 }
 
 // ============ Request/Response types ============
@@ -162,3 +261,5 @@ export interface TerminalTab {
   state: TerminalSessionState;
   title: string;
 }
+
+export type AppModule = 'overview' | 'network' | 'desktop_safety' | 'vulnerabilities' | 'alerts';
