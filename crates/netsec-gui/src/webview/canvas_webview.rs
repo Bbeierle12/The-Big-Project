@@ -43,10 +43,16 @@ impl CanvasWebview {
         // so relative <script src="./widget.js"> would never resolve.
         let html_template = include_str!("../../assets/webview/index.html");
         let widget_js = include_str!("../../assets/webview/widget.js");
-        let html_content = html_template.replace(
-            r#"<script src="./widget.js" onerror="console.warn('Widget bundle not found')"></script>"#,
-            &format!("<script>{}</script>", widget_js),
+        tracing::info!(
+            "widget.js embedded: {} bytes, empty={}",
+            widget_js.len(),
+            widget_js.is_empty()
         );
+        if widget_js.is_empty() {
+            tracing::error!("widget.js is EMPTY — run `npm run build:widget` in frontend/ then rebuild Rust");
+        }
+        let needle = r#"<script src="./widget.js" onerror="console.warn('Widget bundle not found')"></script>"#;
+        let html_content = html_template.replace(needle, &format!("<script>{}</script>", widget_js));
 
         // Create the IPC handler closure
         let webview = WebViewBuilder::new()
@@ -97,6 +103,14 @@ impl CanvasWebview {
 
         let html_template = include_str!("../../assets/webview/index.html");
         let widget_js = include_str!("../../assets/webview/widget.js");
+        tracing::info!(
+            "widget.js embedded: {} bytes, empty={}",
+            widget_js.len(),
+            widget_js.is_empty()
+        );
+        if widget_js.is_empty() {
+            tracing::error!("widget.js is EMPTY — run `npm run build:widget` in frontend/ then rebuild Rust");
+        }
         let needle = r#"<script src="./widget.js" onerror="console.warn('Widget bundle not found')"></script>"#;
         let match_count = html_template.matches(needle).count();
         tracing::info!("widget.js tag match_count={}", match_count);
